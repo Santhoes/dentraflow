@@ -114,7 +114,7 @@ export default function AdminLayout({
       <div className="flex">
         <aside
           className={cn(
-            "fixed inset-y-0 left-0 z-30 w-64 border-r border-slate-200 bg-white pt-14 transition-transform duration-250 ease-out dark:border-slate-700 dark:bg-slate-800 lg:static lg:translate-x-0 lg:transition-none",
+            "fixed inset-y-0 left-0 z-30 w-64 border-r border-slate-200 bg-white pt-14 transition-transform duration-250 ease-out dark:border-slate-700 dark:bg-slate-800 lg:top-14 lg:bottom-0 lg:translate-x-0 lg:transition-none",
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           )}
         >
@@ -141,7 +141,7 @@ export default function AdminLayout({
           </nav>
         </aside>
 
-        <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8 animate-page-enter">{children}</main>
+        <main className="min-w-0 flex-1 p-4 sm:p-6 lg:ml-64 lg:p-8 animate-page-enter">{children}</main>
       </div>
     </div>
   );
