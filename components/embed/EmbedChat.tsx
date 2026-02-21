@@ -130,6 +130,7 @@ export function EmbedChat({ clinicName, locationName, agentName, agentId, clinic
       >
         {logoUrl ? (
           <span className="relative inline-flex shrink-0">
+            {/* eslint-disable-next-line @next/next/no-img-element -- dynamic external logo with onError fallback */}
             <img src={logoUrl} alt="" className="h-8 w-8 rounded object-contain" onError={(e) => { e.currentTarget.style.display = "none"; }} />
             <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-white" aria-hidden />
           </span>

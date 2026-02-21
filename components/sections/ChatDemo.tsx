@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
 
@@ -46,7 +47,7 @@ export function ChatDemo() {
     >
       <div className="flex items-center gap-2 rounded-t-xl border-b border-slate-100 bg-slate-50/80 px-4 py-3">
         <span className="relative inline-flex shrink-0">
-          <img src="/logo.png" alt="" className="h-7 w-7 rounded object-contain" />
+          <Image src="/logo.png" alt="" width={28} height={28} className="h-7 w-7 rounded object-contain" />
           <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-white" aria-hidden />
         </span>
         <span className="text-xs font-medium text-slate-500">DentraFlow • Live</span>

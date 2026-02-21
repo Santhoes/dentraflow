@@ -72,7 +72,7 @@ export async function POST(request: Request) {
     }
 
     const clinicId = (member as { clinic_id: string }).clinic_id;
-    const { data: clinicRow } = await admin.from("clinics").select("country").eq("id", clinicId).single();
+    const { data: clinicRow } = await admin.from("clinics").select("country").eq("id", clinicId).maybeSingle();
     const clinicCountry = (clinicRow as { country?: string } | null)?.country ?? "";
     const payerCountry = typeof body.country === "string" && body.country.trim() ? body.country.trim() : clinicCountry;
 
@@ -126,7 +126,8 @@ export async function POST(request: Request) {
       approvalUrl,
     });
   } catch (e) {
-    console.error("create-renewal-order", e);
+    const err = e instanceof Error ? e : new Error(String(e));
+    console.error("create-renewal-order", err.message, err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

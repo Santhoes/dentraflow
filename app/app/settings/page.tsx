@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useApp } from "@/lib/app-context";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2, Zap, Crown, Lock } from "lucide-react";
@@ -162,7 +163,7 @@ export default function AppSettingsPage() {
                       style={{ backgroundColor: DEMO_PRESETS[demoIndex].headerBg }}
                     >
                       <span className="relative inline-flex shrink-0">
-                        <img src="/logo.png" alt="" className="h-6 w-6 rounded object-contain" />
+                        <Image src="/logo.png" alt="" width={24} height={24} className="h-6 w-6 rounded object-contain" />
                         <span className="absolute bottom-0 right-0 h-1.5 w-1.5 rounded-full bg-emerald-500 ring-2 ring-white" aria-hidden />
                       </span>
                       <span className="truncate text-xs font-medium text-slate-700">
@@ -271,6 +272,7 @@ export default function AppSettingsPage() {
                       style={{ backgroundColor: headerBgHex }}
                     >
                       <span className="relative inline-flex shrink-0">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- dynamic logo with fallback */}
                         <img
                           src={logoUrl.trim() || "/logo.png"}
                           alt=""
