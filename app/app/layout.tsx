@@ -32,7 +32,7 @@ const NAV_ITEMS: { label: string; href: string; icon: typeof LayoutDashboard; mi
   { label: "Analytics", href: "/app/analytics", icon: BarChart3 },
   { label: "AI Agents", href: "/app/agents", icon: Bot },
   { label: "Clinics", href: "/app/locations", icon: MapPin },
-  { label: "Chat", href: "/app/chat", icon: MessageCircle },
+  { label: "Support", href: "/app/support", icon: MessageCircle },
   { label: "Plan & Billing", href: "/app/plan", icon: CreditCard },
 ];
 

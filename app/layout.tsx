@@ -10,7 +10,7 @@ const inter = Inter({
   variable: "--font-geist-sans",
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://dentraflow.com";
+const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.dentraflow.com";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -44,7 +44,7 @@ export const metadata: Metadata = {
     siteName: "DentraFlow",
     images: [
       {
-        url: "/opengraph-image",
+        url: "/og-image.png",
         width: 1200,
         height: 630,
         alt: "DentraFlow – AI Dental Receptionist for 24/7 Appointment Booking",
@@ -56,7 +56,7 @@ export const metadata: Metadata = {
     title: "AI Dental Receptionist That Books Patients 24/7 | DentraFlow",
     description:
       "Never miss another appointment. Automate bookings, reminders, and patient chats with DentraFlow.",
-    images: ["/opengraph-image"],
+    images: ["/og-image.png"],
   },
   icons: {
     icon: [{ url: "/logo.png", type: "image/png", sizes: "32x32" }],
