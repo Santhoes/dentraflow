@@ -350,21 +350,7 @@ function SignupContent() {
                     placeholder="Your Dental Clinic"
                   />
                 </div>
-                <div>
-                  <label htmlFor="country" className="block text-sm font-medium text-slate-700">Country (for billing & tax)</label>
-                  <p className="mt-0.5 text-xs text-slate-500">Payer&apos;s country — used to calculate tax at checkout.</p>
-                  <select
-                    id="country"
-                    value={country}
-                    onChange={(e) => setCountry(e.target.value)}
-                    className="mt-1.5 block w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-slate-900 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary"
-                  >
-                    <option value="">Select country</option>
-                    {COUNTRIES.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
+                <p className="text-xs text-slate-500">Country for billing &amp; tax is auto-detected from your location.</p>
                 <div>
                   <label htmlFor="timezone" className="block text-sm font-medium text-slate-700">Timezone</label>
                   <select

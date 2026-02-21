@@ -348,19 +348,7 @@ export default function AppPlanPage() {
             const withTax = computePriceWithTax(planInfo.priceCents, payerCountry || (clinic.country ?? ""));
             return (
               <div className="mt-4 space-y-2">
-                <div>
-                  <label htmlFor="plan-payer-country" className="block text-xs font-medium text-slate-600">Payer country (for tax)</label>
-                  <select
-                    id="plan-payer-country"
-                    value={payerCountry || clinic.country || ""}
-                    onChange={(e) => setPayerCountry(e.target.value)}
-                    className="mt-0.5 w-full max-w-xs rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
-                  >
-                    {COUNTRIES.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
+                <p className="text-xs text-slate-500">Tax is calculated automatically from your clinic country and location.</p>
                 {withTax.taxRatePercent > 0 && (
                   <div className="rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 text-sm text-slate-600">
                     <p>Subtotal: ${(withTax.subtotalCents / 100).toFixed(2)} · Tax ({withTax.taxRatePercent}%): ${(withTax.taxCents / 100).toFixed(2)} · Total: ${(withTax.totalCents / 100).toFixed(2)}/mo</p>
@@ -453,19 +441,7 @@ export default function AppPlanPage() {
             </div>
             <div className="max-h-[60vh] overflow-y-auto px-6 py-4">
               <div className="space-y-4">
-                <div className="mb-3">
-                  <label htmlFor="modal-payer-country" className="block text-xs font-medium text-slate-600">Payer country (for tax)</label>
-                  <select
-                    id="modal-payer-country"
-                    value={payerCountry || clinic.country || ""}
-                    onChange={(e) => setPayerCountry(e.target.value)}
-                    className="mt-0.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
-                  >
-                    {COUNTRIES.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
+                <p className="text-xs text-slate-500">Tax is calculated automatically from your clinic country and location.</p>
                 {PLANS.map((plan) => {
                   const isCurrent = plan.id === clinic.plan;
                   const isSubscribing = subscribingPlanId === plan.id;
