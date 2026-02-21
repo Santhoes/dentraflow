@@ -298,9 +298,9 @@ export default function AppAgentsPage() {
 
       {/* Add/Edit modal */}
       {(modalOpen === "add" || modalOpen === "edit") && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-          <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 p-3 sm:p-4">
+          <div className="my-auto w-full max-w-md shrink-0 rounded-xl border border-slate-200 bg-white shadow-xl max-h-[90vh] flex flex-col">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-4 sm:px-6 py-4">
               <h3 className="text-lg font-semibold text-slate-900">
                 {modalOpen === "add" ? "Add AI agent" : "Edit agent"}
               </h3>
@@ -313,7 +313,7 @@ export default function AppAgentsPage() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4">
               {error && (
                 <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
               )}
@@ -350,7 +350,7 @@ export default function AppAgentsPage() {
                 </p>
               </div>
             </div>
-            <div className="flex justify-end gap-2 border-t border-slate-200 px-6 py-4">
+            <div className="flex shrink-0 justify-end gap-2 border-t border-slate-200 px-4 sm:px-6 py-4">
               <button
                 type="button"
                 onClick={() => { setModalOpen(null); setError(null); }}

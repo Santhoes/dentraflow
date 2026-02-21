@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyClinicSignature } from "@/lib/chat-signature";
 import { sendResendEmail } from "@/lib/resend";
+import { renderEmailHtml } from "@/lib/email-template";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import { hasPlanFeature } from "@/lib/plan-features";
 
@@ -115,17 +116,17 @@ export async function POST(request: Request) {
   const startDate = new Date(start_time.trim()).toLocaleString(undefined, { dateStyle: "long", timeStyle: "short" });
   const endDate = new Date(end_time.trim()).toLocaleString(undefined, { timeStyle: "short" });
 
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://dentraflow.com").replace(/\/$/, "");
+
   if (patientEmail) {
     await sendResendEmail({
       to: patientEmail,
       subject: `Appointment confirmed — ${clinicName}`,
-      html: `
-        <p>Hi${name ? ` ${name}` : ""},</p>
-        <p>Your appointment at <strong>${clinicName}</strong> is confirmed.</p>
-        <p><strong>When:</strong> ${startDate} – ${endDate}</p>
-        <p>Need to change or cancel later? Just type "change" or "cancel" in the chat anytime.</p>
-        <p>— ${clinicName}</p>
-      `,
+      html: renderEmailHtml({
+        greeting: name ? `Hi ${name},` : "Hi,",
+        body: `<p>Your appointment at <strong>${clinicName}</strong> is confirmed.</p><p><strong>When:</strong> ${startDate} – ${endDate}</p><p>Need to change or cancel later? Just type "change" or "cancel" in the chat on the clinic website.</p>`,
+        footer: `— ${clinicName}`,
+      }),
     });
   }
 
@@ -143,13 +144,10 @@ export async function POST(request: Request) {
     await sendResendEmail({
       to: emails,
       subject: `New appointment (from chat) — ${clinicName}`,
-      html: `
-        <p>Hi,</p>
-        <p>A new appointment was booked via the chat widget for <strong>${clinicName}</strong>.</p>
-        <p><strong>Patient:</strong> ${name}${patientEmail ? ` (${patientEmail})` : ""}</p>
-        <p><strong>When:</strong> ${startDate} – ${endDate}</p>
-        <p>— DentraFlow</p>
-      `,
+      html: renderEmailHtml({
+        body: `<p>A new appointment was booked via the chat widget for <strong>${clinicName}</strong>.</p><p><strong>Patient:</strong> ${name}${patientEmail ? ` (${patientEmail})` : ""}</p><p><strong>When:</strong> ${startDate} – ${endDate}</p>`,
+        button: { text: "View appointments", url: `${appUrl}/app/appointments` },
+      }),
     });
   }
 

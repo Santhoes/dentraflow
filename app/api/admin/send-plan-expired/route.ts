@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/admin-auth";
 import { sendResendEmail } from "@/lib/resend";
+import { renderEmailHtml } from "@/lib/email-template";
 
 /**
  * POST /api/admin/send-plan-expired — send "plan expired" email to clinic owner. Body: { clinicId }.
@@ -59,15 +60,15 @@ export async function POST(request: Request) {
 
   const clinicName = (clinic as { name: string }).name;
   const plan = (clinic as { plan: string }).plan;
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://dentraflow.com").replace(/\/$/, "");
   const result = await sendResendEmail({
     to: ownerEmail,
     subject: `DentraFlow — Your ${clinicName} plan has expired`,
-    html: `
-      <p>Hi,</p>
-      <p>Your DentraFlow plan for <strong>${clinicName}</strong> (${plan}) has expired.</p>
-      <p>Renew to keep your AI receptionist and chat widget active.</p>
-      <p>— DentraFlow</p>
-    `,
+    html: renderEmailHtml({
+      body: `<p>Your DentraFlow plan for <strong>${clinicName}</strong> (${plan}) has expired.</p><p>Renew to keep your AI receptionist and chat widget active.</p>`,
+      button: { text: "Renew plan", url: `${appUrl}/app/plan` },
+      link: { text: "Visit app", url: `${appUrl}/app` },
+    }),
   });
 
   if (!result.ok) {

@@ -346,14 +346,14 @@ export function LocationsMainContent(props: LocationsMainContentProps) {
 
       {/* Add/Edit modal */}
       {(modalOpen === "add" || modalOpen === "edit") && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-3 sm:p-4 overflow-y-auto">
-          <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-xl my-auto">
-            <div className="border-b border-slate-100 px-4 py-3 sm:px-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 p-3 sm:p-4">
+          <div className="my-auto w-full max-w-lg shrink-0 rounded-xl border border-slate-200 bg-white shadow-xl max-h-[90vh] flex flex-col">
+            <div className="shrink-0 border-b border-slate-100 px-4 py-3 sm:px-6">
               <h3 className="text-lg font-semibold text-slate-900">
                 {modalOpen === "add" ? "Add location" : "Edit location"}
               </h3>
             </div>
-            <div className="max-h-[70vh] overflow-y-auto p-4 sm:p-6 space-y-4">
+            <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
               {locationFormError && (
                 <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{locationFormError}</p>
               )}
@@ -520,7 +520,7 @@ export function LocationsMainContent(props: LocationsMainContentProps) {
                 </div>
               </div>
             </div>
-            <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 px-4 py-3 sm:px-6">
+            <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-slate-100 px-4 py-3 sm:px-6">
               <button
                 type="button"
                 onClick={() => { clearLocationFormError(); setModalOpen(null); resetForm(); }}
@@ -544,13 +544,13 @@ export function LocationsMainContent(props: LocationsMainContentProps) {
 
       {/* Edit primary location modal */}
       {primaryEditOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-3 sm:p-4 overflow-y-auto">
-          <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-xl my-auto">
-            <div className="border-b border-slate-100 px-4 py-3 sm:px-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 p-3 sm:p-4">
+          <div className="my-auto w-full max-w-lg shrink-0 rounded-xl border border-slate-200 bg-white shadow-xl max-h-[90vh] flex flex-col">
+            <div className="shrink-0 border-b border-slate-100 px-4 py-3 sm:px-6">
               <h3 className="text-lg font-semibold text-slate-900">Edit primary location</h3>
               <p className="mt-0.5 text-sm text-slate-600">Main clinic name, address, timezone, and WhatsApp number.</p>
             </div>
-            <div className="max-h-[70vh] overflow-y-auto p-4 sm:p-6 space-y-4">
+            <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700">Name *</label>
                 <input
@@ -728,7 +728,7 @@ export function LocationsMainContent(props: LocationsMainContentProps) {
                 </div>
               </div>
             </div>
-            <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 px-4 py-3 sm:px-6">
+            <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-slate-100 px-4 py-3 sm:px-6">
               <button
                 type="button"
                 onClick={() => setPrimaryEditOpen(false)}

@@ -47,18 +47,33 @@ export default function AppChatPage() {
     setSent(false);
     try {
       const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
+      let { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        const { data: { session: refreshed } } = await supabase.auth.refreshSession();
+        session = refreshed ?? null;
+      }
       const token = session?.access_token;
       if (!token) {
         setError("Please sign in again.");
         setSending(false);
         return;
       }
-      const res = await fetch("/api/app/support", {
+      let res = await fetch("/api/app/support", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ subject: subject.trim() || undefined, message: message.trim() }),
       });
+      if (res.status === 401) {
+        const { data: { session: refreshed } } = await supabase.auth.refreshSession();
+        const newToken = refreshed?.access_token;
+        if (newToken) {
+          res = await fetch("/api/app/support", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${newToken}` },
+            body: JSON.stringify({ subject: subject.trim() || undefined, message: message.trim() }),
+          });
+        }
+      }
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data.error || "Failed to send.");

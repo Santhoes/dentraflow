@@ -426,9 +426,9 @@ export default function AppPlanPage() {
 
       {/* Change plan modal */}
       {showPlanModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-          <div className="relative w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 p-3 sm:p-4">
+          <div className="relative my-auto w-full max-w-lg shrink-0 rounded-xl border border-slate-200 bg-white shadow-xl max-h-[90vh] flex flex-col">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-4 sm:px-6 py-4">
               <h3 className="text-lg font-semibold text-slate-900">Change plan</h3>
               <button
                 type="button"
@@ -439,7 +439,7 @@ export default function AppPlanPage() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="max-h-[60vh] overflow-y-auto px-6 py-4">
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-6 py-4">
               <div className="space-y-4">
                 <p className="text-xs text-slate-500">Tax is calculated automatically from your clinic country and location.</p>
                 {PLANS.map((plan) => {
@@ -491,7 +491,7 @@ export default function AppPlanPage() {
                 })}
               </div>
             </div>
-            <div className="border-t border-slate-200 px-6 py-4">
+            <div className="shrink-0 border-t border-slate-200 px-4 sm:px-6 py-4">
               <button
                 type="button"
                 onClick={() => { setShowPlanModal(false); setToast(null); }}

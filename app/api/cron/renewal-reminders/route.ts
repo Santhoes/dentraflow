@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendResendEmail } from "@/lib/resend";
+import { renderEmailHtml } from "@/lib/email-template";
 
 /**
  * GET or POST /api/cron/renewal-reminders
@@ -81,7 +82,8 @@ async function run(request: Request) {
 
   let sentExpired = 0;
   let sentUpcoming = 0;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://dentraflow.com";
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://dentraflow.com").replace(/\/$/, "");
+  const planUrl = `${appUrl}/app/plan`;
 
   for (const c of expired) {
     const ownerId = ownerByClinic[c.id];
@@ -90,12 +92,11 @@ async function run(request: Request) {
     const result = await sendResendEmail({
       to,
       subject: `DentraFlow — Your ${c.name} plan has expired`,
-      html: `
-        <p>Hi,</p>
-        <p>Your DentraFlow plan for <strong>${c.name}</strong> (${c.plan}) has expired.</p>
-        <p>Renew at <strong>${appUrl}/app/plan</strong> to keep your AI receptionist and chat widget active.</p>
-        <p>— DentraFlow</p>
-      `,
+      html: renderEmailHtml({
+        body: `<p>Your DentraFlow plan for <strong>${c.name}</strong> (${c.plan}) has expired.</p><p>Renew to keep your AI receptionist and chat widget active.</p>`,
+        button: { text: "Renew plan", url: planUrl },
+        link: { text: "Visit app", url: `${appUrl}/app` },
+      }),
     });
     if (result.ok) sentExpired++;
   }
@@ -110,12 +111,11 @@ async function run(request: Request) {
     const result = await sendResendEmail({
       to,
       subject: `DentraFlow — Plan renewal reminder for ${c.name}`,
-      html: `
-        <p>Hi,</p>
-        <p>This is a reminder that your DentraFlow plan for <strong>${c.name}</strong> (${c.plan}) expires on <strong>${expiresAt}</strong>.</p>
-        <p>Renew at <strong>${appUrl}/app/plan</strong> to keep your AI receptionist running without interruption.</p>
-        <p>— DentraFlow</p>
-      `,
+      html: renderEmailHtml({
+        body: `<p>This is a reminder that your DentraFlow plan for <strong>${c.name}</strong> (${c.plan}) expires on <strong>${expiresAt}</strong>.</p><p>Renew to keep your AI receptionist running without interruption.</p>`,
+        button: { text: "Renew plan", url: planUrl },
+        link: { text: "View billing", url: planUrl },
+      }),
     });
     if (result.ok) sentUpcoming++;
   }

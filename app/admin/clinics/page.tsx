@@ -273,15 +273,15 @@ export default function AdminClinicsPage() {
       )}
 
       {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !saving && setModal(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-3 sm:p-4" onClick={() => !saving && setModal(null)}>
           <div
-            className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-700 dark:bg-slate-800"
+            className="my-auto w-full max-w-md shrink-0 rounded-xl border border-slate-200 bg-white p-4 sm:p-6 shadow-xl dark:border-slate-700 dark:bg-slate-800 max-h-[90vh] flex flex-col overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
               {modal === "create" ? "Create clinic" : "Edit clinic"}
             </h2>
-            <div className="mt-4 space-y-4">
+            <div className="mt-4 space-y-4 min-h-0 overflow-y-auto flex-1">
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Name</label>
                 <input
