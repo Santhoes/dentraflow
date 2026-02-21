@@ -39,7 +39,23 @@ export async function POST(request: Request) {
   if (!member?.clinic_id) return NextResponse.json({ error: "No clinic" }, { status: 403 });
 
   const clinicId = (member as { clinic_id: string }).clinic_id;
-  const { error: insertErr } = await supabase.from("support_messages").insert({
+  // #region agent log
+  const runId = "support-insert";
+  fetch("http://127.0.0.1:7785/ingest/8b7a328f-cfbf-41bb-bc5d-dd8a87f78da9", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f6ea83" },
+    body: JSON.stringify({
+      sessionId: "f6ea83",
+      location: "app/api/app/support/route.ts:POST",
+      message: "Support insert using admin client",
+      data: { clinicId: clinicId.slice(0, 8), userIdLen: user.id?.length ?? 0 },
+      timestamp: Date.now(),
+      hypothesisId: "A",
+      runId,
+    }),
+  }).catch(() => {});
+  // #endregion
+  const { error: insertErr } = await admin.from("support_messages").insert({
     clinic_id: clinicId,
     user_id: user.id,
     subject: subject || "Support request",

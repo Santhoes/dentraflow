@@ -36,7 +36,6 @@ export const metadata: Metadata = {
   alternates: { canonical: siteUrl },
   robots: "index, follow",
   openGraph: {
-    // Add public/og-image.png (1200×630) for social previews when not using dynamic OG.
     title: "AI Dental Receptionist That Books Patients 24/7 | DentraFlow",
     description:
       "Never miss another appointment. Automate bookings, reminders, and patient chats with DentraFlow.",
@@ -45,7 +44,7 @@ export const metadata: Metadata = {
     siteName: "DentraFlow",
     images: [
       {
-        url: "/og-image.png",
+        url: "/opengraph-image",
         width: 1200,
         height: 630,
         alt: "DentraFlow – AI Dental Receptionist for 24/7 Appointment Booking",
@@ -57,7 +56,7 @@ export const metadata: Metadata = {
     title: "AI Dental Receptionist That Books Patients 24/7 | DentraFlow",
     description:
       "Never miss another appointment. Automate bookings, reminders, and patient chats with DentraFlow.",
-    images: ["/og-image.png"],
+    images: ["/opengraph-image"],
   },
   icons: {
     icon: [{ url: "/logo.png", type: "image/png", sizes: "32x32" }],
