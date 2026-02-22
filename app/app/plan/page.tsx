@@ -100,12 +100,21 @@ export default function AppPlanPage() {
       .catch(() => {});
   }, []);
 
-  // Handle return from PayPal renewal
+  // Handle return from PayPal renewal (success, cancel, or fail)
   useEffect(() => {
     if (typeof window === "undefined" || !clinic?.id) return;
     const params = new URLSearchParams(window.location.search);
     const renew = params.get("renew");
+    const cancelled = params.get("cancelled");
     const orderId = params.get("token") || params.get("orderId");
+
+    // Cancelled or failed: user came back without approving (e.g. clicked Cancel on PayPal)
+    if (renew === "1" && (cancelled === "1" || !orderId)) {
+      window.history.replaceState({}, "", "/app/plan");
+      setToast({ message: "Payment was cancelled.", type: "error" });
+      return;
+    }
+
     if (renew !== "1" || !orderId) return;
 
     const plan = sessionStorage.getItem(RENEW_STORAGE_KEY) || clinic.plan;
@@ -371,7 +380,7 @@ export default function AppPlanPage() {
 
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <p className="font-semibold text-slate-900">Your plan limits</p>
-        <p className="mt-0.5 text-sm text-slate-600">Clinics, AI agents, and chat widgets included in your plan.</p>
+        <p className="mt-0.5 text-sm text-slate-600">Clinics, staff accounts, and chat widgets included in your plan.</p>
         <dl className="mt-4 grid gap-3 sm:grid-cols-3">
           <div>
             <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Clinics / branches</dt>
@@ -380,9 +389,9 @@ export default function AppPlanPage() {
             </dd>
           </div>
           <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">AI agents</dt>
+            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Staff accounts</dt>
             <dd className="mt-0.5 text-lg font-semibold text-slate-900">
-              {formatPlanLimit(getPlanLimit(clinic.plan, "aiAgents"))}
+              {formatPlanLimit(getPlanLimit(clinic.plan, "staffAssistants"))}
             </dd>
           </div>
           <div>
@@ -426,8 +435,16 @@ export default function AppPlanPage() {
 
       {/* Change plan modal */}
       {showPlanModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 p-3 sm:p-4">
-          <div className="relative my-auto w-full max-w-lg shrink-0 rounded-xl border border-slate-200 bg-white shadow-xl max-h-[90vh] flex flex-col">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 p-3 sm:p-4"
+          onClick={() => { setShowPlanModal(false); setToast(null); }}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="relative my-auto w-full max-w-lg shrink-0 rounded-xl border border-slate-200 bg-white shadow-xl max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-4 sm:px-6 py-4">
               <h3 className="text-lg font-semibold text-slate-900">Change plan</h3>
               <button

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { adminFetch } from "@/lib/admin-api";
 import { MessageSquare, Loader2, Send } from "lucide-react";
 
@@ -14,7 +15,10 @@ interface SupportMessageRow {
   created_at: string;
   admin_reply: string | null;
   admin_replied_at: string | null;
+  status?: string;
 }
+
+type StatusFilter = "all" | "open" | "closed";
 
 export default function AdminSupportPage() {
   const [messages, setMessages] = useState<SupportMessageRow[]>([]);
@@ -23,6 +27,7 @@ export default function AdminSupportPage() {
   const [replyingId, setReplyingId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
   const [saving, setSaving] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   const load = useCallback(() => {
     setLoading(true);
@@ -86,28 +91,66 @@ export default function AdminSupportPage() {
         </div>
       )}
 
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Filter:</span>
+        {(["all", "open", "closed"] as const).map((f) => (
+          <button
+            key={f}
+            type="button"
+            onClick={() => setStatusFilter(f)}
+            className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize ${
+              statusFilter === f
+                ? "bg-primary text-white dark:bg-primary/90"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
+            }`}
+          >
+            {f}
+          </button>
+        ))}
+      </div>
+
       {loading ? (
         <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
           <Loader2 className="h-5 w-5 animate-spin" /> Loading…
         </div>
-      ) : messages.length === 0 ? (
-        <p className="text-slate-600 dark:text-slate-400">No support messages yet.</p>
-      ) : (
+      ) : (() => {
+        const filtered = statusFilter === "all"
+          ? messages
+          : messages.filter((m) => (m.status || "open") === statusFilter);
+        return filtered.length === 0 ? (
+          <p className="text-slate-600 dark:text-slate-400">
+            {messages.length === 0 ? "No support messages yet." : `No ${statusFilter} cases.`}
+          </p>
+        ) : (
         <div className="space-y-4">
-          {messages.map((m) => (
+          {filtered.map((m) => (
             <div
               key={m.id}
               className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800"
             >
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <MessageSquare className="h-4 w-4 text-slate-500" />
-                <span className="font-medium text-slate-900 dark:text-slate-100">{m.subject || "Support request"}</span>
+                <Link
+                  href={`/admin/support/${m.id}`}
+                  className="font-medium text-slate-900 underline hover:no-underline dark:text-slate-100"
+                >
+                  {m.subject || "Support request"}
+                </Link>
                 <span className="text-slate-500 dark:text-slate-400">{m.clinic_name}</span>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                    (m.status || "open") === "closed"
+                      ? "bg-slate-200 text-slate-600 dark:bg-slate-600 dark:text-slate-300"
+                      : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+                  }`}
+                >
+                  {(m.status || "open") === "closed" ? "Closed" : "Open"}
+                </span>
                 <span className="text-slate-400 dark:text-slate-500">
                   {new Date(m.created_at).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}
                 </span>
               </div>
-              <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">{m.body}</p>
+              <p className="mt-2 line-clamp-2 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">{m.body}</p>
               {m.admin_reply && replyingId !== m.id && (
                 <div className="mt-3 border-t border-slate-200 pt-3 dark:border-slate-600">
                   <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Your reply</p>
@@ -158,7 +201,8 @@ export default function AdminSupportPage() {
             </div>
           ))}
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

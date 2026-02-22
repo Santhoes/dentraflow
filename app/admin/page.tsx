@@ -46,6 +46,18 @@ type Stats = {
   plansExpiringSoon: number;
 };
 
+function defaultToDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+function defaultFromDate(groupBy: GroupBy) {
+  const d = new Date();
+  if (groupBy === "month") d.setMonth(d.getMonth() - 6);
+  else if (groupBy === "year") d.setFullYear(d.getFullYear() - 2);
+  else if (groupBy === "week") d.setDate(d.getDate() - 60);
+  else d.setDate(d.getDate() - 30);
+  return d.toISOString().slice(0, 10);
+}
+
 export default function AdminDashboardPage() {
   const [groupBy, setGroupBy] = useState<GroupBy>("month");
   const [from, setFrom] = useState("");
@@ -57,6 +69,7 @@ export default function AdminDashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [initialized, setInitialized] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -88,20 +101,17 @@ export default function AdminDashboardPage() {
   };
 
   useEffect(() => {
-    if (!to) {
-      const end = new Date();
-      setTo(end.toISOString().slice(0, 10));
+    if (!initialized) {
+      setTo(defaultToDate());
+      setFrom(defaultFromDate(groupBy));
+      setInitialized(true);
     }
-    if (!from && groupBy === "month") {
-      const d = new Date();
-      d.setMonth(d.getMonth() - 6);
-      setFrom(d.toISOString().slice(0, 10));
-    }
-  }, [groupBy]);
+  }, [groupBy, initialized]);
 
   useEffect(() => {
+    if (!initialized) return;
     load();
-  }, [groupBy, from, to]);
+  }, [groupBy, from, to, initialized]);
 
   const earningsData = earnings.map((r) => ({
     ...r,

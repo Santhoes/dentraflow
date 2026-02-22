@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { sendResendEmail } from "@/lib/resend";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import { hasPlanFeature } from "@/lib/plan-features";
+import { renderEmailHtml, escapeHtml } from "@/lib/email-template";
+import { buildGoogleCalendarUrl } from "@/lib/google-calendar-url";
 
 /**
  * POST /api/app/appointments — create an appointment. Auth required; user must be clinic member.
@@ -147,18 +149,27 @@ export async function POST(request: Request) {
   const clinicPhone = c?.whatsapp_phone?.trim() || c?.phone?.trim();
   const startDate = new Date(startTime).toLocaleString(undefined, { dateStyle: "long", timeStyle: "short" });
   const endDate = new Date(endTime).toLocaleString(undefined, { timeStyle: "short" });
+  const isProOrElite = clinicPlan === "pro" || clinicPlan === "elite";
+  const gcalUrl =
+    isProOrElite && startTime && endTime
+      ? buildGoogleCalendarUrl({
+          title: `Appointment at ${clinicName}`,
+          start: startTime,
+          end: endTime,
+          details: clinicName,
+        })
+      : null;
 
   if (patientEmail) {
     await sendResendEmail({
       to: patientEmail,
       subject: `Appointment confirmed — ${clinicName}`,
-      html: `
-        <p>Hi${patientName ? ` ${patientName}` : ""},</p>
-        <p>Your appointment at <strong>${clinicName}</strong> is confirmed.</p>
-        <p><strong>When:</strong> ${startDate} – ${endDate}</p>
-        <p>If you need to change or cancel, reply to this email or contact the clinic.</p>
-        <p>— ${clinicName}</p>
-      `,
+      html: renderEmailHtml({
+        greeting: patientName ? `Hi ${escapeHtml(patientName)},` : "Hi,",
+        body: `<p>Your appointment at <strong>${escapeHtml(clinicName)}</strong> is confirmed.</p><p><strong>When:</strong> ${escapeHtml(startDate)} – ${escapeHtml(endDate)}</p><p>If you need to change or cancel, reply to this email or contact the clinic.</p>`,
+        link: gcalUrl ? { text: "Add to Google Calendar", url: gcalUrl } : undefined,
+        footer: `— ${escapeHtml(clinicName)}`,
+      }),
     });
   }
 
@@ -196,4 +207,44 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ ok: true, appointment_id: (appointment as { id: string }).id });
+}
+
+/**
+ * PATCH /api/app/appointments — mark past appointments (slot time over) as completed.
+ * No body. Updates scheduled/confirmed appointments with end_time < now() to status 'completed'.
+ */
+export async function PATCH(request: Request) {
+  const authHeader = request.headers.get("authorization");
+  const token = authHeader?.replace("Bearer ", "").trim();
+  if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) return NextResponse.json({ error: "Server config" }, { status: 500 });
+
+  const supabase = createClient(url, anonKey);
+  const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+  if (userError || !user) return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+
+  const admin = createAdminClient();
+  const { data: member } = await admin
+    .from("clinic_members")
+    .select("clinic_id")
+    .eq("user_id", user.id)
+    .limit(1)
+    .maybeSingle();
+  if (!member?.clinic_id) return NextResponse.json({ error: "No clinic" }, { status: 403 });
+
+  const clinicId = (member as { clinic_id: string }).clinic_id;
+  const now = new Date().toISOString();
+
+  const { error: updateErr } = await admin
+    .from("appointments")
+    .update({ status: "completed" })
+    .eq("clinic_id", clinicId)
+    .in("status", ["scheduled", "confirmed"])
+    .lt("end_time", now);
+
+  if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
 }

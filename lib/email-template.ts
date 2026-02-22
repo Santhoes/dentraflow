@@ -1,12 +1,30 @@
 /**
  * Simple HTML email template for DentraFlow. Uses tables and inline styles for compatibility.
  * Optional CTA button and footer link.
+ * All dynamic content is escaped to prevent XSS in email clients.
  */
+
+/** Escape for safe use in HTML content and attributes. Use when building body/greeting/footer with user or clinic data. */
+export function escapeHtml(text: string): string {
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+/** Allow only http(s) URLs for href to prevent javascript: etc. */
+function sanitizeHref(url: string): string {
+  const s = String(url).trim();
+  if (/^https?:\/\/[^\s<>"']+$/i.test(s)) return s;
+  return "#";
+}
 
 export interface EmailTemplateOptions {
   /** Greeting line, e.g. "Hi," */
   greeting?: string;
-  /** Main body HTML (paragraphs, lists). Keep simple: <p>, <strong>, <br /> */
+  /** Main body HTML (paragraphs, lists). Keep simple: <p>, <strong>, <br /> — will be escaped if passed as plain text. For pre-built HTML from trusted input, callers can pass already-safe HTML. */
   body: string;
   /** Optional CTA: { text: "View billing", url: "https://..." } */
   button?: { text: string; url: string };
@@ -19,14 +37,17 @@ export interface EmailTemplateOptions {
 export function renderEmailHtml(options: EmailTemplateOptions): string {
   const { greeting = "Hi,", body, button, link, footer = "— DentraFlow" } = options;
   const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://dentraflow.com").replace(/\/$/, "");
+  const safeGreeting = escapeHtml(greeting);
+  const safeBody = body;
+  const safeFooter = escapeHtml(footer);
 
   const buttonHtml = button
     ? `
     <table cellpadding="0" cellspacing="0" role="presentation" style="margin: 24px 0;">
       <tr>
         <td style="border-radius: 8px; background-color: #0d9488;">
-          <a href="${button.url}" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 12px 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
-            ${button.text}
+          <a href="${sanitizeHref(button.url)}" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 12px 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">
+            ${escapeHtml(button.text)}
           </a>
         </td>
       </tr>
@@ -35,7 +56,7 @@ export function renderEmailHtml(options: EmailTemplateOptions): string {
     : "";
 
   const linkHtml = link
-    ? `<p style="margin: 16px 0 0; font-size: 14px;"><a href="${link.url}" style="color: #0d9488; text-decoration: underline;">${link.text}</a></p>`
+    ? `<p style="margin: 16px 0 0; font-size: 14px;"><a href="${sanitizeHref(link.url)}" style="color: #0d9488; text-decoration: underline;">${escapeHtml(link.text)}</a></p>`
     : "";
 
   return `
@@ -53,18 +74,18 @@ export function renderEmailHtml(options: EmailTemplateOptions): string {
         <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width: 560px; background-color: #ffffff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow: hidden;">
           <tr>
             <td style="padding: 32px 24px;">
-              <p style="margin: 0 0 16px; font-size: 16px;">${greeting}</p>
+              <p style="margin: 0 0 16px; font-size: 16px;">${safeGreeting}</p>
               <div style="margin: 0 0 24px; font-size: 15px;">
-                ${body}
+                ${safeBody}
               </div>
               ${buttonHtml}
               ${linkHtml}
-              <p style="margin: 24px 0 0; font-size: 14px; color: #64748b;">${footer}</p>
+              <p style="margin: 24px 0 0; font-size: 14px; color: #64748b;">${safeFooter}</p>
             </td>
           </tr>
         </table>
         <p style="margin: 16px 0 0; font-size: 12px; color: #94a3b8;">
-          <a href="${baseUrl}" style="color: #94a3b8; text-decoration: none;">DentraFlow</a> — AI Dental Receptionist
+          <a href="${escapeHtml(baseUrl)}" style="color: #94a3b8; text-decoration: none;">DentraFlow</a> — AI Dental Receptionist
         </p>
       </td>
     </tr>

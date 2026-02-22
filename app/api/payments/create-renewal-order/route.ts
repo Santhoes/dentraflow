@@ -78,10 +78,11 @@ export async function POST(request: Request) {
 
     const { computePriceWithTax } = await import("@/lib/tax-by-country");
     const { totalCents } = computePriceWithTax(planInfo.priceCents, payerCountry);
-    const amountCents = typeof body.amountCents === "number" && body.amountCents >= 0 ? body.amountCents : totalCents;
+    const amountCents = totalCents;
 
     const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://dentraflow.com").replace(/\/$/, "");
     const returnUrl = `${appUrl}/app/plan?renew=1`;
+    const cancelUrl = `${appUrl}/app/plan?renew=1&cancelled=1`;
     const token2 = await getAccessToken();
     const value = (amountCents / 100).toFixed(2);
     const res = await fetch(`${PAYPAL_API}/v2/checkout/orders`, {
@@ -100,7 +101,7 @@ export async function POST(request: Request) {
         ],
         application_context: {
           return_url: returnUrl,
-          cancel_url: returnUrl,
+          cancel_url: cancelUrl,
           brand_name: "DentraFlow",
         },
       }),

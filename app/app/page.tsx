@@ -13,8 +13,9 @@ import {
   Calendar as CalendarIcon,
   Clock,
   XCircle,
+  BarChart3,
 } from "lucide-react";
-import { hasPlanFeature, planAtLeast } from "@/lib/plan-features";
+import { hasPlanFeature, planAtLeast, normalizePlan } from "@/lib/plan-features";
 
 /** YYYY-MM-DD for a given date. */
 function toDateStr(d: Date): string {
@@ -70,6 +71,19 @@ interface DayAppointmentRow {
   patient?: { full_name: string };
 }
 
+function getWeekRange(): { from: Date; to: Date } {
+  const now = new Date();
+  const day = now.getDay();
+  const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(now);
+  monday.setDate(diff);
+  monday.setHours(0, 0, 0, 0);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+  return { from: monday, to: sunday };
+}
+
 export default function AppDashboardPage() {
   const { clinic, refetchClinic } = useApp();
   const [markingComplete, setMarkingComplete] = useState(false);
@@ -78,6 +92,7 @@ export default function AppDashboardPage() {
   const [dayLoading, setDayLoading] = useState(false);
   const [dayError, setDayError] = useState<string | null>(null);
   const [briefingRefreshKey, setBriefingRefreshKey] = useState(0);
+  const [basicStats, setBasicStats] = useState<{ today: number; week: number } | null>(null);
 
   const fetchDayAppointments = useCallback(async () => {
     if (!clinic?.id) return;
@@ -132,6 +147,37 @@ export default function AppDashboardPage() {
     fetchDayAppointments();
   }, [clinic?.id, clinic?.plan, briefingDate, briefingRefreshKey, fetchDayAppointments]);
 
+  const showBasicAnalytics = clinic && (normalizePlan(clinic.plan) === "starter" || normalizePlan(clinic.plan) === "pro");
+
+  useEffect(() => {
+    if (!clinic?.id || !showBasicAnalytics) return;
+    const supabase = createClient();
+    const todayStr = toDateStr(new Date());
+    const { from: todayFrom, to: todayTo } = getDayRange(todayStr);
+    const { from: weekFrom, to: weekTo } = getWeekRange();
+    Promise.all([
+      supabase
+        .from("appointments")
+        .select("id", { count: "exact", head: true })
+        .eq("clinic_id", clinic.id)
+        .gte("start_time", todayFrom.toISOString())
+        .lte("start_time", todayTo.toISOString())
+        .in("status", ["pending", "scheduled", "confirmed"]),
+      supabase
+        .from("appointments")
+        .select("id", { count: "exact", head: true })
+        .eq("clinic_id", clinic.id)
+        .gte("start_time", weekFrom.toISOString())
+        .lte("start_time", weekTo.toISOString())
+        .in("status", ["pending", "scheduled", "confirmed"]),
+    ]).then(([todayRes, weekRes]) => {
+      setBasicStats({
+        today: todayRes.count ?? 0,
+        week: weekRes.count ?? 0,
+      });
+    }).catch(() => setBasicStats({ today: 0, week: 0 }));
+  }, [clinic?.id, showBasicAnalytics]);
+
   const showSetupPrompt = clinic && !(clinic as { settings_completed_at?: string | null }).settings_completed_at;
 
   const handleMarkSetupComplete = async () => {
@@ -161,6 +207,31 @@ export default function AppDashboardPage() {
         <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Overview</h1>
         <p className="mt-1 text-sm text-slate-600 sm:text-base">{clinic.name}</p>
       </div>
+
+      {showBasicAnalytics && (
+        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-900">
+            <BarChart3 className="h-5 w-5 text-primary" />
+            At a glance
+          </h2>
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-3 sm:p-4">
+              <p className="text-2xl font-bold text-slate-900 sm:text-3xl">{basicStats?.today ?? "—"}</p>
+              <p className="mt-0.5 text-xs font-medium text-slate-600">Appointments today</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-3 sm:p-4">
+              <p className="text-2xl font-bold text-slate-900 sm:text-3xl">{basicStats?.week ?? "—"}</p>
+              <p className="mt-0.5 text-xs font-medium text-slate-600">This week</p>
+            </div>
+          </div>
+          <Link
+            href="/app/analytics"
+            className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+          >
+            <BarChart3 className="h-4 w-4" /> View full analytics
+          </Link>
+        </section>
+      )}
 
       {showSetupPrompt && (
         <div className="card-hover rounded-xl border-2 border-primary/30 bg-primary/5 p-4 shadow-sm sm:p-6">

@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 const NAV = [
-  { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
+  { label: "Dashboard & Analytics", href: "/admin", icon: LayoutDashboard },
   { label: "Clinics & Staff", href: "/admin/clinics", icon: Building2 },
   { label: "Billing", href: "/admin/billing", icon: CreditCard },
   { label: "Appointments", href: "/admin/appointments", icon: Calendar },
@@ -89,7 +89,7 @@ export default function AdminLayout({
           <button
             type="button"
             onClick={() => setSidebarOpen((o) => !o)}
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 active:bg-slate-200 lg:hidden dark:hover:bg-slate-700 dark:active:bg-slate-600"
+            className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 active:bg-slate-200 lg:hidden dark:hover:bg-slate-700 dark:active:bg-slate-600 touch-manipulation"
             aria-label="Toggle menu"
           >
             {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -103,7 +103,7 @@ export default function AdminLayout({
             <button
               type="button"
               onClick={handleSignOut}
-              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 active:bg-slate-200 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-100 dark:active:bg-slate-600"
+              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 active:bg-slate-200 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-100 dark:active:bg-slate-600 touch-manipulation sm:min-w-0"
             >
               <LogOut className="h-4 w-4 shrink-0" /> <span className="hidden sm:inline">Sign out</span>
             </button>
@@ -127,7 +127,7 @@ export default function AdminLayout({
                   href={item.href}
                   onClick={() => setSidebarOpen(false)}
                   className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-150",
+                    "flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-150 touch-manipulation",
                     isActive
                       ? "bg-primary/10 text-primary dark:bg-primary/20"
                       : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-100"

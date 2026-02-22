@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PLANS, slugFromName } from "@/lib/supabase/types";
+import { computePriceWithTax } from "@/lib/tax-by-country";
+import { getCapturedAmountUsd, verifyCaptureAmountForPlan } from "@/lib/payment-verify";
 
 const PAYPAL_API = "https://api-m.paypal.com";
 
@@ -79,7 +81,36 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Payment not completed" }, { status: 402 });
     }
 
+    const paypalOrderId = captureData.id || orderId;
+    const capturedUsd = getCapturedAmountUsd(captureData);
+    if (capturedUsd == null) {
+      return NextResponse.json({ error: "Could not read capture amount" }, { status: 402 });
+    }
+    const verify = verifyCaptureAmountForPlan(capturedUsd, plan, country?.trim() || "Other");
+    if (!verify.ok) {
+      return NextResponse.json({ error: verify.error || "Amount mismatch" }, { status: 400 });
+    }
+
     const admin = createAdminClient();
+    const { data: existingPayment } = await admin
+      .from("payments")
+      .select("clinic_id")
+      .eq("paypal_order_id", paypalOrderId)
+      .maybeSingle();
+    if (existingPayment?.clinic_id) {
+      const { data: existingClinic } = await admin
+        .from("clinics")
+        .select("slug")
+        .eq("id", (existingPayment as { clinic_id: string }).clinic_id)
+        .single();
+      const slug = (existingClinic as { slug?: string } | null)?.slug;
+      return NextResponse.json({
+        success: true,
+        clinicId: (existingPayment as { clinic_id: string }).clinic_id,
+        slug: slug ?? null,
+      });
+    }
+
     const slug = slugFromName(clinicName);
     const slugExists = await admin.from("clinics").select("id").eq("slug", slug).maybeSingle();
     let finalSlug = slug;
@@ -87,7 +118,8 @@ export async function POST(request: Request) {
       finalSlug = `${slug}-${Date.now().toString(36)}`;
     }
 
-    const planExpiresAt = amountCents > 0
+    const planInfo = PLANS.find((p) => p.id === plan)!;
+    const planExpiresAt = planInfo.priceCents > 0
       ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
       : null;
 
@@ -117,15 +149,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Failed to add you to clinic" }, { status: 500 });
     }
 
-    const paypalOrderId = captureData.id || orderId;
-    const amount = (amountCents / 100).toFixed(2);
-    const taxAmount = typeof taxCents === "number" && taxCents >= 0 ? (taxCents / 100).toFixed(2) : null;
+    const { taxCents: taxCentsComputed } = computePriceWithTax(
+      PLANS.find((p) => p.id === plan)!.priceCents,
+      country?.trim() || "Other"
+    );
+    const taxAmount = taxCentsComputed > 0 ? taxCentsComputed / 100 : null;
     await admin.from("payments").insert({
       clinic_id: clinic.id,
       paypal_order_id: paypalOrderId,
       plan,
-      amount: parseFloat(amount),
-      tax_amount: taxAmount != null ? parseFloat(taxAmount) : null,
+      amount: capturedUsd,
+      tax_amount: taxAmount,
       country: country?.trim() || null,
       currency: "USD",
       status: "completed",

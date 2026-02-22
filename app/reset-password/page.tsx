@@ -58,7 +58,7 @@ export default function ResetPasswordPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="rounded-2xl border border-slate-200/80 bg-white p-8 shadow-soft text-center"
+            className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-soft text-center sm:p-8"
           >
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">Check your email</h1>
             <p className="mt-4 text-slate-600">
@@ -79,7 +79,7 @@ export default function ResetPasswordPage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="rounded-2xl border border-slate-200/80 bg-white p-8 shadow-soft"
+            className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-soft sm:p-8"
         >
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Reset password</h1>
           <p className="mt-2 text-sm text-slate-600">
@@ -96,12 +96,12 @@ export default function ResetPasswordPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="email"
-                className="mt-1.5 block w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-slate-900 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary"
+                className="mt-1.5 block w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-base text-slate-900 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary touch-manipulation sm:text-sm"
                 placeholder="you@clinic.com"
               />
             </div>
             {error && <p className="text-sm text-red-600">{error}</p>}
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="min-h-[44px] w-full touch-manipulation" disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send reset link"}
             </Button>
           </form>

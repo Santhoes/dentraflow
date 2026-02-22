@@ -27,7 +27,7 @@ export function Footer() {
               <Link
                 key={link.label}
                 href={link.href}
-                className="text-sm font-medium text-slate-600 transition-colors hover:text-primary dark:text-slate-400 dark:hover:text-primary-400"
+                className="inline-block min-h-[44px] py-2 text-sm font-medium text-slate-600 transition-colors hover:text-primary dark:text-slate-400 dark:hover:text-primary-400 touch-manipulation sm:py-0"
               >
                 {link.label}
               </Link>
@@ -38,7 +38,7 @@ export function Footer() {
               <Link
                 key={link.label}
                 href={link.href}
-                className="text-sm font-medium text-slate-600 transition-colors hover:text-primary dark:text-slate-400 dark:hover:text-primary-400"
+                className="inline-block min-h-[44px] py-2 text-sm font-medium text-slate-600 transition-colors hover:text-primary dark:text-slate-400 dark:hover:text-primary-400 touch-manipulation sm:py-0"
               >
                 {link.label}
               </Link>

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sendResendEmail } from "@/lib/resend";
+import { checkContactRateLimit, getClientIp } from "@/lib/contact-rate-limit";
 
 const MAX_NAME = 200;
 const MAX_MESSAGE = 5000;
@@ -17,8 +18,18 @@ function escapeHtml(text: string): string {
 /**
  * POST /api/contact — public contact form. Sends email to CONTACT_EMAIL or support@dentraflow.com.
  * Body: { name: string, email: string, message: string }
+ * Rate limited: 5 submissions per IP per minute.
  */
 export async function POST(request: Request) {
+  const ip = getClientIp(request);
+  const { allowed } = await checkContactRateLimit(ip);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Too many submissions. Please try again in a minute." },
+      { status: 429 }
+    );
+  }
+
   let body: { name?: string; email?: string; message?: string };
   try {
     body = await request.json();

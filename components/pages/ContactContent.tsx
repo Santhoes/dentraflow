@@ -72,7 +72,7 @@ export function ContactContent() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="mt-10 rounded-2xl border border-slate-200/80 bg-white p-8 shadow-soft"
+          className="mt-10 rounded-2xl border border-slate-200/80 bg-white p-6 shadow-soft sm:p-8"
         >
           {success ? (
             <p className="rounded-lg bg-primary/10 p-4 text-sm font-medium text-primary">
@@ -90,7 +90,7 @@ export function ContactContent() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   maxLength={200}
-                  className="mt-1.5 block w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-slate-900 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary"
+                  className="mt-1.5 block w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-base text-slate-900 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary touch-manipulation sm:text-sm"
                   placeholder="Your name"
                   disabled={loading}
                 />
@@ -105,7 +105,7 @@ export function ContactContent() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="mt-1.5 block w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-slate-900 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary"
+                  className="mt-1.5 block w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-base text-slate-900 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary touch-manipulation sm:text-sm"
                   placeholder="you@clinic.com"
                   disabled={loading}
                 />
@@ -120,13 +120,13 @@ export function ContactContent() {
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   maxLength={5000}
-                  className="mt-1.5 block w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-slate-900 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary"
+                  className="mt-1.5 block w-full min-h-[120px] rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-base text-slate-900 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary touch-manipulation sm:text-sm"
                   placeholder="How can we help?"
                   disabled={loading}
                 />
               </div>
               {error && <p className="text-sm text-red-600">{error}</p>}
-              <Button type="submit" className="w-full sm:w-auto" disabled={loading}>
+              <Button type="submit" className="min-h-[44px] w-full touch-manipulation sm:w-auto" disabled={loading}>
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send message"}
               </Button>
             </form>

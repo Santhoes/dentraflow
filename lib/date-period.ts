@@ -1,7 +1,7 @@
 export type FilterPeriod = "today" | "yesterday" | "week" | "month" | "year";
 
-/** For upcoming section: future only, up to a month (today / week / month). */
-export type UpcomingPeriod = "today" | "week" | "month";
+/** For upcoming section: future only (today / tomorrow / week / month). */
+export type UpcomingPeriod = "today" | "tomorrow" | "week" | "month";
 
 /** For completed section: past only (today = start of today to now, yesterday/week/month/year = full period in past). */
 export type PastPeriod = "today" | "yesterday" | "week" | "month" | "year";
@@ -16,8 +16,9 @@ export const PERIOD_OPTIONS: { value: FilterPeriod; label: string }[] = [
 
 export const UPCOMING_PERIOD_OPTIONS: { value: UpcomingPeriod; label: string }[] = [
   { value: "today", label: "Today" },
-  { value: "week", label: "This week" },
-  { value: "month", label: "This month" },
+  { value: "tomorrow", label: "Tomorrow" },
+  { value: "week", label: "7 days" },
+  { value: "month", label: "Month" },
 ];
 
 export const PAST_PERIOD_OPTIONS: { value: PastPeriod; label: string }[] = [
@@ -65,7 +66,7 @@ export function getRange(period: FilterPeriod): { from: Date; to: Date } {
   return { from, to };
 }
 
-/** From now to end of today/week/month. Use for upcoming appointments (no year). */
+/** From now (or start of period) to end. Use for upcoming appointments. */
 export function getUpcomingRange(period: UpcomingPeriod): { from: Date; to: Date } {
   const now = new Date();
   const from = new Date(now);
@@ -74,14 +75,19 @@ export function getUpcomingRange(period: UpcomingPeriod): { from: Date; to: Date
     case "today":
       to.setHours(23, 59, 59, 999);
       break;
-    case "week": {
-      const day = to.getDay();
-      const daysToEnd = day === 0 ? 0 : 7 - day;
-      to.setDate(to.getDate() + daysToEnd);
+    case "tomorrow":
+      from.setDate(from.getDate() + 1);
+      from.setHours(0, 0, 0, 0);
+      to.setDate(to.getDate() + 1);
       to.setHours(23, 59, 59, 999);
       break;
-    }
+    case "week":
+      from.setHours(0, 0, 0, 0);
+      to.setDate(to.getDate() + 6);
+      to.setHours(23, 59, 59, 999);
+      break;
     case "month":
+      from.setHours(0, 0, 0, 0);
       to.setMonth(to.getMonth() + 1, 0);
       to.setHours(23, 59, 59, 999);
       break;

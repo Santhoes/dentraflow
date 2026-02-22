@@ -3,7 +3,7 @@
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
-import { EmbedChat } from "@/components/embed/EmbedChat";
+import { DentalChat } from "@/components/embed/DentalChat";
 
 function EmbedChatContent() {
   const searchParams = useSearchParams();
@@ -14,14 +14,21 @@ function EmbedChatContent() {
     location_name?: string | null;
     agent_name?: string | null;
     agent_id?: string | null;
+    plan?: string | null;
     accepts_insurance: boolean;
     insurance_notes: string | null;
     logo_url: string | null;
     widget_primary_color: string | null;
     widget_background_color: string | null;
+    phone?: string | null;
+    whatsapp_phone?: string | null;
+    working_hours?: Record<string, { open: string; close: string }> | null;
+    address?: string | null;
+    timezone?: string;
   } | null>(null);
   const [loading, setLoading] = useState(!!slug);
   const [error, setError] = useState<string | null>(null);
+  const [isWidgetOpen, setIsWidgetOpen] = useState(false);
 
   const locationId = searchParams.get("location")?.trim() || null;
   const agentId = searchParams.get("agent")?.trim() || null;
@@ -53,11 +60,17 @@ function EmbedChatContent() {
           location_name: data.location_name ?? null,
           agent_name: data.agent_name ?? null,
           agent_id: data.agent_id ?? null,
+          plan: data.plan ?? null,
           accepts_insurance: data.accepts_insurance !== false,
           insurance_notes: data.insurance_notes ?? null,
           logo_url: data.logo_url ?? null,
           widget_primary_color: data.widget_primary_color ?? null,
           widget_background_color: data.widget_background_color ?? null,
+          phone: data.phone ?? null,
+          whatsapp_phone: data.whatsapp_phone ?? null,
+          working_hours: data.working_hours ?? null,
+          address: data.address ?? null,
+          timezone: data.timezone ?? "America/New_York",
         });
       } catch {
         if (!cancelled) {
@@ -75,16 +88,22 @@ function EmbedChatContent() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[400px] items-center justify-center bg-white">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      <div
+        className="flex min-h-[100dvh] w-full items-center justify-center bg-slate-50 dark:bg-slate-900 sm:min-h-[400px]"
+        style={{ minHeight: "320px" }}
+      >
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-slate-300 border-t-primary" />
       </div>
     );
   }
 
   if (error || (slug && !clinic)) {
     return (
-      <div className="flex min-h-[400px] items-center justify-center bg-white p-4">
-        <p className="text-center text-sm text-slate-500">
+      <div
+        className="flex min-h-[100dvh] w-full items-center justify-center bg-slate-50 p-4 dark:bg-slate-900 sm:min-h-[400px]"
+        style={{ minHeight: "320px" }}
+      >
+        <p className="text-center text-sm text-slate-500 dark:text-slate-400">
           {error === "Chat unavailable" || error === "Invalid link"
             ? "Chat unavailable."
             : error || "Clinic not found."}
@@ -94,8 +113,15 @@ function EmbedChatContent() {
   }
 
   return (
-    <div className="mx-auto h-full min-h-[50dvh] w-full max-w-full px-2 sm:max-w-md sm:min-h-[400px] sm:px-0">
-      <EmbedChat
+    <div
+      className={
+        isWidgetOpen
+          ? "min-h-[100dvh] w-full bg-slate-50 dark:bg-slate-900 sm:min-h-[400px]"
+          : "min-h-0 w-full bg-transparent"
+      }
+      style={isWidgetOpen ? { minHeight: "320px" } : undefined}
+    >
+      <DentalChat
         clinicName={clinic!.name}
         locationName={clinic!.location_name ?? undefined}
         agentName={clinic!.agent_name ?? undefined}
@@ -105,7 +131,17 @@ function EmbedChatContent() {
         sig={sig!}
         logoUrl={clinic!.logo_url ?? undefined}
         primaryColor={clinic!.widget_primary_color ?? undefined}
-        headerBackgroundColor={clinic!.widget_background_color ?? undefined}
+        isElitePlan={clinic!.plan === "elite"}
+        plan={clinic!.plan ?? null}
+        onOpenChange={setIsWidgetOpen}
+        clinicInfo={{
+          name: clinic!.name,
+          phone: clinic!.phone ?? undefined,
+          whatsapp_phone: clinic!.whatsapp_phone ?? undefined,
+          working_hours: clinic!.working_hours ?? undefined,
+          address: clinic!.address ?? undefined,
+          timezone: clinic!.timezone ?? "America/New_York",
+        }}
       />
     </div>
   );
@@ -115,8 +151,11 @@ export default function EmbedChatPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-[400px] items-center justify-center bg-white">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        <div
+          className="flex min-h-[100dvh] w-full items-center justify-center bg-slate-50 dark:bg-slate-900 sm:min-h-[400px]"
+          style={{ minHeight: "320px" }}
+        >
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-slate-300 border-t-primary" />
         </div>
       }
     >

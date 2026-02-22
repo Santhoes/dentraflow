@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/admin-auth";
 import { sendResendEmail } from "@/lib/resend";
-import { renderEmailHtml } from "@/lib/email-template";
+import { renderEmailHtml, escapeHtml } from "@/lib/email-template";
 
 /**
  * POST /api/admin/send-plan-expired — send "plan expired" email to clinic owner. Body: { clinicId }.
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     to: ownerEmail,
     subject: `DentraFlow — Your ${clinicName} plan has expired`,
     html: renderEmailHtml({
-      body: `<p>Your DentraFlow plan for <strong>${clinicName}</strong> (${plan}) has expired.</p><p>Renew to keep your AI receptionist and chat widget active.</p>`,
+      body: `<p>Your DentraFlow plan for <strong>${escapeHtml(clinicName)}</strong> (${escapeHtml(plan)}) has expired.</p><p>Renew to keep your AI receptionist and chat widget active.</p>`,
       button: { text: "Renew plan", url: `${appUrl}/app/plan` },
       link: { text: "Visit app", url: `${appUrl}/app` },
     }),

@@ -426,7 +426,7 @@ function SignupContent() {
                         key={plan.id}
                         type="button"
                         onClick={() => setSelectedPlan(plan.id)}
-                        className={`w-full rounded-xl border p-4 text-left transition-all ${
+                        className={`w-full min-h-[44px] rounded-xl border p-4 text-left transition-all touch-manipulation ${
                           selectedPlan === plan.id
                             ? "border-primary bg-primary/5 ring-2 ring-primary/30"
                             : "border-slate-200 hover:border-slate-300"

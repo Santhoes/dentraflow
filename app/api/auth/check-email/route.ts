@@ -1,11 +1,21 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { checkEmailRateLimit, getClientIp } from "@/lib/check-email-rate-limit";
 
 /**
  * POST /api/auth/check-email — returns { exists: boolean } for signup/reset flows.
- * Unauthenticated; allows email enumeration. Rate-limit this route at the edge (e.g. Vercel) in production.
+ * Rate limited: 10 requests per IP per minute. Consider edge rate limiting in production.
  */
 export async function POST(request: Request) {
+  const ip = getClientIp(request);
+  const { allowed } = await checkEmailRateLimit(ip);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again in a minute." },
+      { status: 429 }
+    );
+  }
+
   let body: { email?: unknown };
   try {
     body = await request.json();

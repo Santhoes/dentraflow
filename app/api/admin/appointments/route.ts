@@ -16,6 +16,12 @@ export async function GET(request: Request) {
   const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || String(PAGE_SIZE), 10)));
   const offset = (page - 1) * limit;
 
+  // Use start-of-day for from, end-of-day for to so the selected date range is inclusive
+  const fromTime = fromParam ? new Date(fromParam + "T00:00:00.000Z").toISOString() : null;
+  const toTime = toParam
+    ? new Date(toParam + "T23:59:59.999Z").toISOString()
+    : null;
+
   const admin = createAdminClient();
 
   let query = admin
@@ -23,8 +29,8 @@ export async function GET(request: Request) {
     .select("id, clinic_id, patient_id, start_time, end_time, status, created_at", { count: "exact" });
 
   if (clinicId) query = query.eq("clinic_id", clinicId);
-  if (fromParam) query = query.gte("start_time", fromParam);
-  if (toParam) query = query.lte("start_time", toParam);
+  if (fromTime) query = query.gte("start_time", fromTime);
+  if (toTime) query = query.lte("start_time", toTime);
 
   const { data: appointments, error, count } = await query
     .order("start_time", { ascending: false })
@@ -59,8 +65,8 @@ export async function GET(request: Request) {
 
   let byClinicQuery = admin.from("appointments").select("clinic_id");
   if (clinicId) byClinicQuery = byClinicQuery.eq("clinic_id", clinicId);
-  if (fromParam) byClinicQuery = byClinicQuery.gte("start_time", fromParam);
-  if (toParam) byClinicQuery = byClinicQuery.lte("start_time", toParam);
+  if (fromTime) byClinicQuery = byClinicQuery.gte("start_time", fromTime);
+  if (toTime) byClinicQuery = byClinicQuery.lte("start_time", toTime);
   const { data: allForCount } = await byClinicQuery.limit(2000);
   const byClinic: Record<string, number> = {};
   for (const a of allForCount || []) {

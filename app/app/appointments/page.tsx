@@ -38,7 +38,8 @@ interface AppointmentRow {
 function useUpcomingAppointments(
   clinicId: string | undefined,
   period: UpcomingPeriod,
-  page: number
+  page: number,
+  refreshKey: number
 ) {
   const [list, setList] = useState<AppointmentRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -111,7 +112,7 @@ function useUpcomingAppointments(
         setTotalCount(0);
         setLoading(false);
       });
-  }, [clinicId, period, page]);
+  }, [clinicId, period, page, refreshKey]);
 
   return { list, totalCount, loading };
 }
@@ -119,7 +120,8 @@ function useUpcomingAppointments(
 function usePastAppointments(
   clinicId: string | undefined,
   period: PastPeriod,
-  page: number
+  page: number,
+  refreshKey: number
 ) {
   const [list, setList] = useState<AppointmentRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -192,7 +194,7 @@ function usePastAppointments(
         setTotalCount(0);
         setLoading(false);
       });
-  }, [clinicId, period, page]);
+  }, [clinicId, period, page, refreshKey]);
 
   return { list, totalCount, loading };
 }
@@ -211,18 +213,34 @@ export default function AppAppointmentsPage() {
   const [pastPeriod, setPastPeriod] = useState<PastPeriod>("week");
   const [pastPage, setPastPage] = useState(1);
   const [downloadingCompletedPdf, setDownloadingCompletedPdf] = useState(false);
+  const [markPastRefresh, setMarkPastRefresh] = useState(0);
+
+  useEffect(() => {
+    if (!clinic?.id) return;
+    const run = async () => {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+      const res = await fetch("/api/app/appointments", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (res.ok) setMarkPastRefresh((k) => k + 1);
+    };
+    void run();
+  }, [clinic?.id]);
 
   const {
     list: upcomingList,
     totalCount: upcomingTotal,
     loading: upcomingLoading,
-  } = useUpcomingAppointments(clinic?.id, upcomingPeriod, upcomingPage);
+  } = useUpcomingAppointments(clinic?.id, upcomingPeriod, upcomingPage, markPastRefresh);
 
   const {
     list: pastList,
     totalCount: pastTotal,
     loading: pastLoading,
-  } = usePastAppointments(clinic?.id, pastPeriod, pastPage);
+  } = usePastAppointments(clinic?.id, pastPeriod, pastPage, markPastRefresh);
 
   const formatDate = useCallback(
     (s: string) =>
@@ -394,7 +412,7 @@ export default function AppAppointmentsPage() {
               setUpcomingPeriod(e.target.value as UpcomingPeriod);
               setUpcomingPage(1);
             }}
-            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="min-h-[44px] rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary touch-manipulation"
           >
             {UPCOMING_PERIOD_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -409,7 +427,7 @@ export default function AppAppointmentsPage() {
             <button
               type="button"
               onClick={handleAddAllUpcomingToCalendar}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 touch-manipulation"
             >
               <CalendarPlus className="h-4 w-4" />
               Add all upcoming to Google Calendar
@@ -479,7 +497,7 @@ export default function AppAppointmentsPage() {
               type="button"
               onClick={() => setUpcomingPage((p) => Math.max(1, p - 1))}
               disabled={upcomingPage <= 1}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="inline-flex min-h-[44px] items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 touch-manipulation"
             >
               <ChevronLeft className="h-4 w-4" /> Previous
             </button>
@@ -489,7 +507,7 @@ export default function AppAppointmentsPage() {
                 setUpcomingPage((p) => Math.min(upcomingPages, p + 1))
               }
               disabled={upcomingPage >= upcomingPages}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="inline-flex min-h-[44px] items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 touch-manipulation"
             >
               Next <ChevronRight className="h-4 w-4" />
             </button>
@@ -514,7 +532,7 @@ export default function AppAppointmentsPage() {
               setPastPeriod(e.target.value as PastPeriod);
               setPastPage(1);
             }}
-            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="min-h-[44px] rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary touch-manipulation"
           >
             {PAST_PERIOD_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -529,7 +547,7 @@ export default function AppAppointmentsPage() {
             type="button"
             onClick={handleDownloadCompletedPdf}
             disabled={downloadingCompletedPdf || pastTotal === 0}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50"
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50 touch-manipulation"
           >
             {downloadingCompletedPdf ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -602,7 +620,7 @@ export default function AppAppointmentsPage() {
               type="button"
               onClick={() => setPastPage((p) => Math.max(1, p - 1))}
               disabled={pastPage <= 1}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="inline-flex min-h-[44px] items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 touch-manipulation"
             >
               <ChevronLeft className="h-4 w-4" /> Previous
             </button>
@@ -610,7 +628,7 @@ export default function AppAppointmentsPage() {
               type="button"
               onClick={() => setPastPage((p) => Math.min(pastPages, p + 1))}
               disabled={pastPage >= pastPages}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="inline-flex min-h-[44px] items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 touch-manipulation"
             >
               Next <ChevronRight className="h-4 w-4" />
             </button>

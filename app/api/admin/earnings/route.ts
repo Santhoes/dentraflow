@@ -114,9 +114,11 @@ export async function GET(request: Request) {
         current.setDate(current.getDate() + 7);
         break;
       case "month":
+        current.setDate(1);
         current.setMonth(current.getMonth() + 1);
         break;
       case "year":
+        current.setDate(1);
         current.setFullYear(current.getFullYear() + 1);
         break;
       default:

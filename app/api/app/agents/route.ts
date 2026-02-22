@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getPlanLimit } from "@/lib/plan-features";
+
+/** One booking assistant per clinic for embed/chat; no plan-based limit. */
+const BOOKING_ASSISTANT_LIMIT = 1;
 
 /**
- * GET /api/app/agents — list AI agents for the clinic. Returns agents and plan limit.
- * POST /api/app/agents — create an AI agent (name required). Enforces plan limit.
+ * GET /api/app/agents — list booking assistant(s) for the clinic. Used by embed.
+ * POST /api/app/agents — create a booking assistant (name required). Max one per clinic.
  */
 async function getClinicIdAndPlan(token: string): Promise<{ clinicId: string; plan: string } | null> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -55,10 +57,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Failed to list agents" }, { status: 500 });
   }
 
-  const limit = getPlanLimit(ctx.plan, "aiAgents");
   return NextResponse.json({
     agents: agents ?? [],
-    limit,
+    limit: BOOKING_ASSISTANT_LIMIT,
     count: (agents ?? []).length,
   });
 }
@@ -84,7 +85,6 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient();
-  const limit = getPlanLimit(ctx.plan, "aiAgents");
   const { count, error: countErr } = await admin
     .from("ai_agents")
     .select("id", { count: "exact", head: true })
@@ -94,9 +94,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to check limit" }, { status: 500 });
   }
   const currentCount = count ?? 0;
-  if (limit !== null && currentCount >= limit) {
+  if (currentCount >= BOOKING_ASSISTANT_LIMIT) {
     return NextResponse.json(
-      { error: `Plan limit reached. Your plan allows ${limit} AI agent${limit === 1 ? "" : "s"}. Upgrade to add more.` },
+      { error: "Your clinic can have one booking assistant for the chat widget." },
       { status: 403 }
     );
   }

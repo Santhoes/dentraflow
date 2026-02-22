@@ -72,11 +72,18 @@ export async function GET(request: Request) {
       .maybeSingle();
     if (loc) embedUrl += `&location=${encodeURIComponent(locationId)}`;
   }
-  const iframeSnippet = `<div id="dentraflow-chat" style="position:fixed;bottom:0;right:0;z-index:99999;width:400px;max-width:100%;height:500px;box-shadow:0 0 20px rgba(0,0,0,0.15);border-radius:12px 0 0 0;overflow:hidden;"><iframe src="${embedUrl}" title="Chat with us" width="100%" height="100%" style="border:none;"></iframe></div>`;
-  const iframeSnippetWithButton = `<!-- DentraFlow chat: fixed bottom-right. Works on any website. -->\n${iframeSnippet}`;
+  // Single iframe: widget inside has launcher (open) and header minimize (close). Each URL is clinic/location-specific.
+  const iframeSnippet = `<!-- DentraFlow chat widget: one iframe per clinic/location. Widget includes launcher icon and chat panel with close (X). -->
+<div id="dentraflow-chat-root" style="position:fixed;bottom:0;right:0;z-index:99999;font-family:system-ui,sans-serif;background:transparent;pointer-events:none;">
+  <iframe
+    src="${embedUrl}"
+    title="Chat with us"
+    style="width:min(360px,100vw);height:min(480px,75vh);border:none;display:block;border-radius:0;box-shadow:0 -4px 24px rgba(0,0,0,0.12);pointer-events:auto;"
+  ></iframe>
+</div>`;
   return NextResponse.json({
     embedUrl,
-    iframeSnippet: iframeSnippetWithButton,
+    iframeSnippet,
     clinicSlug: clinic.slug,
     locationId: locationId || null,
     agentId: agentId || null,

@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     const supabase = createAdminClient();
     const { data: clinic, error: clinicErr } = await supabase
       .from("clinics")
-      .select("id, name, slug, plan, accepts_insurance, insurance_notes, plan_expires_at, logo_url, widget_primary_color, widget_background_color")
+      .select("id, name, slug, plan, accepts_insurance, insurance_notes, plan_expires_at, logo_url, widget_primary_color, widget_background_color, phone, whatsapp_phone, working_hours, address_line1, address_line2, timezone")
       .eq("slug", slug)
       .limit(1)
       .maybeSingle();
@@ -44,6 +44,11 @@ export async function GET(request: Request) {
     let location_name: string | null = null;
     let agent_name: string | null = null;
     let effectiveLocationId: string | null = locationId;
+    let phone: string | null = (clinic as { phone?: string | null }).phone?.trim() || null;
+    let whatsapp_phone: string | null = (clinic as { whatsapp_phone?: string | null }).whatsapp_phone?.trim() || null;
+    let working_hours: Record<string, { open: string; close: string }> | null = (clinic as { working_hours?: Record<string, { open: string; close: string }> | null }).working_hours ?? null;
+    let address_line1: string | null = (clinic as { address_line1?: string | null }).address_line1?.trim() || null;
+    let address_line2: string | null = (clinic as { address_line2?: string | null }).address_line2?.trim() || null;
 
     if (agentId) {
       const { data: agent } = await supabase
@@ -62,7 +67,7 @@ export async function GET(request: Request) {
     if (effectiveLocationId) {
       const { data: loc } = await supabase
         .from("clinic_locations")
-        .select("name, working_hours, accepts_insurance, insurance_notes")
+        .select("name, working_hours, accepts_insurance, insurance_notes, address_line1, address_line2")
         .eq("id", effectiveLocationId)
         .eq("clinic_id", clinic.id)
         .maybeSingle();
@@ -70,6 +75,9 @@ export async function GET(request: Request) {
         location_name = loc.name;
         if (loc.accepts_insurance !== undefined && loc.accepts_insurance !== null) accepts_insurance = loc.accepts_insurance;
         if (loc.insurance_notes !== undefined && loc.insurance_notes !== null) insurance_notes = loc.insurance_notes;
+        if (loc.working_hours != null) working_hours = loc.working_hours as Record<string, { open: string; close: string }>;
+        if ((loc as { address_line1?: string | null }).address_line1 != null) address_line1 = (loc as { address_line1: string }).address_line1?.trim() || null;
+        if ((loc as { address_line2?: string | null }).address_line2 != null) address_line2 = (loc as { address_line2: string }).address_line2?.trim() || null;
       }
     }
 
@@ -88,6 +96,8 @@ export async function GET(request: Request) {
     const logo_url =
       plan === "elite" && customLogo ? customLogo : defaultLogoUrl;
 
+    const address = [address_line1, address_line2].filter(Boolean).join(", ") || null;
+    const timezone = (clinic as { timezone?: string | null }).timezone?.trim() || "America/New_York";
     return NextResponse.json({
       id: clinic.id,
       name,
@@ -95,12 +105,18 @@ export async function GET(request: Request) {
       agent_name: agent_name ?? null,
       agent_id: agentId || null,
       slug: clinic.slug,
+      plan: plan,
       accepts_insurance,
       insurance_notes,
       plan_active: true,
       logo_url,
       widget_primary_color: clinic.widget_primary_color ?? null,
       widget_background_color: clinic.widget_background_color ?? null,
+      phone: phone ?? null,
+      whatsapp_phone: whatsapp_phone ?? null,
+      working_hours: working_hours ?? null,
+      address: address ?? null,
+      timezone,
     });
   } catch (e) {
     return NextResponse.json({ error: "Server error" }, { status: 500 });

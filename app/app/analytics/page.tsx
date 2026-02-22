@@ -683,29 +683,29 @@ export default function AppAnalyticsPage() {
         <>
           <section>
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Summary</h2>
-            <div className="overflow-x-auto rounded-xl border border-slate-700 bg-slate-800">
+            <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
               <table className="w-full max-w-md text-sm">
                 <thead>
-                  <tr className="border-b border-slate-600 text-left">
-                    <th className="px-4 py-3 font-semibold text-white">Metric</th>
-                    <th className="px-4 py-3 font-semibold text-white">Value</th>
+                  <tr className="border-b border-slate-200 text-left">
+                    <th className="px-4 py-3 font-semibold text-slate-900">Metric</th>
+                    <th className="px-4 py-3 font-semibold text-slate-900">Value</th>
                   </tr>
                 </thead>
-                <tbody className="text-white">
-                  <tr className="border-b border-slate-600">
-                    <td className="px-4 py-3 text-slate-300">Total bookings</td>
+                <tbody className="text-slate-700">
+                  <tr className="border-b border-slate-100">
+                    <td className="px-4 py-3 text-slate-600">Total bookings</td>
                     <td className="px-4 py-3">{loading ? "…" : stats?.appointments ?? 0}</td>
                   </tr>
-                  <tr className="border-b border-slate-600">
-                    <td className="px-4 py-3 text-slate-300">Completed</td>
+                  <tr className="border-b border-slate-100">
+                    <td className="px-4 py-3 text-slate-600">Completed</td>
                     <td className="px-4 py-3">{loading ? "…" : stats?.completed ?? 0}</td>
                   </tr>
-                  <tr className="border-b border-slate-600">
-                    <td className="px-4 py-3 text-slate-300">Cancelled</td>
+                  <tr className="border-b border-slate-100">
+                    <td className="px-4 py-3 text-slate-600">Cancelled</td>
                     <td className="px-4 py-3">{loading ? "…" : stats?.cancelled ?? 0}</td>
                   </tr>
-                  <tr className="border-b border-slate-600">
-                    <td className="px-4 py-3 text-slate-300">New patients</td>
+                  <tr className="border-b border-slate-100">
+                    <td className="px-4 py-3 text-slate-600">New patients</td>
                     <td className="px-4 py-3">{loading ? "…" : stats?.patients ?? 0}</td>
                   </tr>
                 </tbody>
@@ -744,25 +744,25 @@ export default function AppAnalyticsPage() {
             {/* Bookings by location (Pro/Elite with multiple clinics) */}
             <div>
               <p className="mb-2 text-sm font-medium text-slate-700">Bookings by location</p>
-              <div className="overflow-x-auto rounded-xl border border-slate-700 bg-slate-800">
+              <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-600 text-left">
-                      <th className="px-4 py-3 font-semibold text-white">Location</th>
-                      <th className="px-4 py-3 font-semibold text-white">Bookings</th>
+                    <tr className="border-b border-slate-200 text-left">
+                      <th className="px-4 py-3 font-semibold text-slate-900">Location</th>
+                      <th className="px-4 py-3 font-semibold text-slate-900">Bookings</th>
                     </tr>
                   </thead>
-                  <tbody className="text-white">
+                  <tbody className="text-slate-700">
                     {advancedLoading ? (
-                      <tr className="border-b border-slate-600">
+                      <tr className="border-b border-slate-200">
                         <td colSpan={2} className="px-4 py-6 text-center text-slate-400">
                           Loading…
                         </td>
                       </tr>
                     ) : (
                       byLocation.map((row) => (
-                        <tr key={row.locationId ?? "primary"} className="border-b border-slate-600 last:border-b-0">
-                          <td className="px-4 py-3 text-slate-300">{row.locationName}</td>
+                        <tr key={row.locationId ?? "primary"} className="border-b border-slate-200 last:border-b-0">
+                          <td className="px-4 py-3 text-slate-600">{row.locationName}</td>
                           <td className="px-4 py-3">{row.count}</td>
                         </tr>
                       ))
@@ -792,25 +792,25 @@ export default function AppAnalyticsPage() {
                     : "No data for this period."}
               </p>
             </div>
-            <div className="overflow-x-auto rounded-xl border border-slate-700 bg-slate-800">
+            <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-600 text-left">
-                    <th className="px-4 py-3 font-semibold text-white">Day</th>
-                    <th className="px-4 py-3 font-semibold text-white">Bookings</th>
+                  <tr className="border-b border-slate-200 text-left">
+                    <th className="px-4 py-3 font-semibold text-slate-900">Day</th>
+                    <th className="px-4 py-3 font-semibold text-slate-900">Bookings</th>
                   </tr>
                 </thead>
-                <tbody className="text-white">
+                <tbody className="text-slate-700">
                   {advancedLoading ? (
-                    <tr className="border-b border-slate-600">
+                    <tr className="border-b border-slate-200">
                       <td colSpan={2} className="px-4 py-6 text-center text-slate-400">
                         Loading…
                       </td>
                     </tr>
                   ) : (
                     DAY_NAMES.map((day, i) => (
-                      <tr key={day} className="border-b border-slate-600 last:border-b-0">
-                        <td className="px-4 py-3 text-slate-300">{day}</td>
+                      <tr key={day} className="border-b border-slate-200 last:border-b-0">
+                        <td className="px-4 py-3 text-slate-600">{day}</td>
                         <td className="px-4 py-3">{byDay[i] ?? 0}</td>
                       </tr>
                     ))
@@ -820,31 +820,31 @@ export default function AppAnalyticsPage() {
             </div>
             <div>
               <p className="mb-2 text-sm font-medium text-slate-700">Treatment / reason breakdown</p>
-              <div className="overflow-x-auto rounded-xl border border-slate-700 bg-slate-800">
+              <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-600 text-left">
-                      <th className="px-4 py-3 font-semibold text-white">Reason / treatment</th>
-                      <th className="px-4 py-3 font-semibold text-white">Count</th>
+                    <tr className="border-b border-slate-200 text-left">
+                      <th className="px-4 py-3 font-semibold text-slate-900">Reason / treatment</th>
+                      <th className="px-4 py-3 font-semibold text-slate-900">Count</th>
                     </tr>
                   </thead>
-                  <tbody className="text-white">
+                  <tbody className="text-slate-700">
                     {advancedLoading ? (
-                      <tr className="border-b border-slate-600">
+                      <tr className="border-b border-slate-200">
                         <td colSpan={2} className="px-4 py-6 text-center text-slate-400">
                           Loading…
                         </td>
                       </tr>
                     ) : byReason.length === 0 ? (
-                      <tr className="border-b border-slate-600">
+                      <tr className="border-b border-slate-200">
                         <td colSpan={2} className="px-4 py-6 text-center text-slate-400">
                           No reason data for this period. Add reasons when creating appointments.
                         </td>
                       </tr>
                     ) : (
                       byReason.map((r) => (
-                        <tr key={r.reason} className="border-b border-slate-600 last:border-b-0">
-                          <td className="px-4 py-3 text-slate-300">{r.reason}</td>
+                        <tr key={r.reason} className="border-b border-slate-200 last:border-b-0">
+                          <td className="px-4 py-3 text-slate-600">{r.reason}</td>
                           <td className="px-4 py-3">{r.count}</td>
                         </tr>
                       ))
@@ -857,39 +857,39 @@ export default function AppAnalyticsPage() {
             {/* Period comparison */}
             <div>
               <p className="mb-2 text-sm font-medium text-slate-700">Period comparison</p>
-              <div className="overflow-x-auto rounded-xl border border-slate-700 bg-slate-800">
+              <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-600 text-left">
-                      <th className="px-4 py-3 font-semibold text-white">Metric</th>
-                      <th className="px-4 py-3 font-semibold text-white">This period</th>
-                      <th className="px-4 py-3 font-semibold text-white">{prevLabel}</th>
-                      <th className="px-4 py-3 font-semibold text-white">Change</th>
+                    <tr className="border-b border-slate-200 text-left">
+                      <th className="px-4 py-3 font-semibold text-slate-900">Metric</th>
+                      <th className="px-4 py-3 font-semibold text-slate-900">This period</th>
+                      <th className="px-4 py-3 font-semibold text-slate-900">{prevLabel}</th>
+                      <th className="px-4 py-3 font-semibold text-slate-900">Change</th>
                     </tr>
                   </thead>
-                  <tbody className="text-white">
+                  <tbody className="text-slate-700">
                     {advancedLoading || previousStats == null ? (
-                      <tr className="border-b border-slate-600">
+                      <tr className="border-b border-slate-200">
                         <td colSpan={4} className="px-4 py-6 text-center text-slate-400">
                           Loading…
                         </td>
                       </tr>
                     ) : (
                       <>
-                        <tr className="border-b border-slate-600">
-                          <td className="px-4 py-3 text-slate-300">Bookings</td>
+                        <tr className="border-b border-slate-200">
+                          <td className="px-4 py-3 text-slate-600">Bookings</td>
                           <td className="px-4 py-3">{stats?.appointments ?? 0}</td>
                           <td className="px-4 py-3">{previousStats.appointments}</td>
                           <td className="px-4 py-3">{pctChange(stats?.appointments ?? 0, previousStats.appointments)}</td>
                         </tr>
-                        <tr className="border-b border-slate-600">
-                          <td className="px-4 py-3 text-slate-300">Completed</td>
+                        <tr className="border-b border-slate-200">
+                          <td className="px-4 py-3 text-slate-600">Completed</td>
                           <td className="px-4 py-3">{stats?.completed ?? 0}</td>
                           <td className="px-4 py-3">{previousStats.completed}</td>
                           <td className="px-4 py-3">{pctChange(stats?.completed ?? 0, previousStats.completed)}</td>
                         </tr>
-                        <tr className="border-b border-slate-600">
-                          <td className="px-4 py-3 text-slate-300">New patients</td>
+                        <tr className="border-b border-slate-200">
+                          <td className="px-4 py-3 text-slate-600">New patients</td>
                           <td className="px-4 py-3">{stats?.patients ?? 0}</td>
                           <td className="px-4 py-3">{previousStats.patients}</td>
                           <td className="px-4 py-3">{pctChange(stats?.patients ?? 0, previousStats.patients)}</td>
@@ -939,25 +939,25 @@ export default function AppAnalyticsPage() {
             {/* Peak hours and busiest times */}
             <div>
               <p className="mb-2 text-sm font-medium text-slate-700">Peak hours and busiest times</p>
-              <div className="overflow-x-auto rounded-xl border border-slate-700 bg-slate-800">
+              <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-600 text-left">
-                      <th className="px-4 py-3 font-semibold text-white">Hour</th>
-                      <th className="px-4 py-3 font-semibold text-white">Bookings</th>
+                    <tr className="border-b border-slate-200 text-left">
+                      <th className="px-4 py-3 font-semibold text-slate-900">Hour</th>
+                      <th className="px-4 py-3 font-semibold text-slate-900">Bookings</th>
                     </tr>
                   </thead>
-                  <tbody className="text-white">
+                  <tbody className="text-slate-700">
                     {advancedLoading ? (
-                      <tr className="border-b border-slate-600">
+                      <tr className="border-b border-slate-200">
                         <td colSpan={2} className="px-4 py-6 text-center text-slate-400">
                           Loading…
                         </td>
                       </tr>
                     ) : (
                       HOUR_LABELS.map((hour, i) => (
-                        <tr key={hour} className="border-b border-slate-600 last:border-b-0">
-                          <td className="px-4 py-3 text-slate-300">{hour}</td>
+                        <tr key={hour} className="border-b border-slate-200 last:border-b-0">
+                          <td className="px-4 py-3 text-slate-600">{hour}</td>
                           <td className="px-4 py-3">{byHour[i] ?? 0}</td>
                         </tr>
                       ))

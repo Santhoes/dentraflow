@@ -26,6 +26,8 @@ export const PLAN_FEATURE_MAP: Record<string, PlanId> = {
   advancedInsights: "elite",
   noShowRecovery: "elite",
   customBranding: "elite",
+  /** Add to Google Calendar after booking (chat + confirmation email). */
+  googleCalendar: "pro",
 };
 
 /** Normalize plan string from DB (e.g. legacy "enterprise" -> "elite") */
@@ -48,10 +50,10 @@ export function planAtLeast(plan: string | null | undefined, minPlan: PlanId): b
   return PLAN_ORDER[normalizePlan(plan)] >= PLAN_ORDER[minPlan];
 }
 
-/** Get plan limit for a key (locations, aiAgents, chatWidgets). Returns null for unlimited. */
+/** Get plan limit for a key (locations, staffAssistants, chatWidgets). Returns null for unlimited. */
 export function getPlanLimit(
   plan: string | null | undefined,
-  key: "locations" | "aiAgents" | "chatWidgets"
+  key: "locations" | "staffAssistants" | "chatWidgets"
 ): number | null {
   return PLAN_LIMITS[normalizePlan(plan)][key];
 }

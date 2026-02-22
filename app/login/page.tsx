@@ -25,20 +25,26 @@ function LoginContent() {
     }
     setLoading(true);
     const supabase = createClient();
+    const normalizedEmail = email.trim().toLowerCase();
     const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
+      email: normalizedEmail,
       password,
     });
     setLoading(false);
     if (signInError) {
-      setError(signInError.message);
+      const isAdminEmail = normalizedEmail === "admin@dentraflow.com";
+      const message = isAdminEmail
+        ? "Admin sign-in failed. Ensure the user admin@dentraflow.com exists in your Supabase project (Auth → Users). Create it or reset the password there, then try again."
+        : signInError.message;
+      setError(message);
       return;
     }
-    // Admin redirect
-    if (email.trim().toLowerCase() === "admin@dentraflow.com") {
+    if (normalizedEmail === "admin@dentraflow.com") {
+      await new Promise((r) => setTimeout(r, 150));
       window.location.href = "/admin";
       return;
     }
+    await new Promise((r) => setTimeout(r, 150));
     window.location.href = "/app";
   };
 
@@ -71,7 +77,7 @@ function LoginContent() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="email"
-                className="mt-1.5 block w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-slate-900 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary"
+                className="mt-1.5 block w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-base text-slate-900 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary touch-manipulation sm:text-sm"
                 placeholder="you@clinic.com"
               />
             </div>
@@ -85,7 +91,7 @@ function LoginContent() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="current-password"
-                className="mt-1.5 block w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-slate-900 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary"
+                className="mt-1.5 block w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-base text-slate-900 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary touch-manipulation sm:text-sm"
               />
               <p className="mt-1.5 text-right">
                 <Link href="/reset-password" className="text-sm font-medium text-primary hover:underline">

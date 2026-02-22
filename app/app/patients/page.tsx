@@ -209,7 +209,7 @@ export default function AppPatientsPage() {
           id="patients-period"
           value={period}
           onChange={(e) => setPeriod(e.target.value as PastPeriod)}
-          className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          className="min-h-[44px] rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary touch-manipulation"
         >
           {PAST_PERIOD_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -225,7 +225,7 @@ export default function AppPatientsPage() {
           type="button"
           onClick={handleDownloadPdf}
           disabled={downloadingPdf || totalCount === 0}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50"
+          className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50 touch-manipulation"
         >
           {downloadingPdf ? (
             <Loader2 className="h-4 w-4 animate-spin" />

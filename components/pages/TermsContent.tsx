@@ -25,7 +25,7 @@ export function TermsContent() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="prose prose-slate mt-10 max-w-none space-y-8 text-slate-600"
+          className="prose prose-slate mt-10 max-w-none space-y-8 text-slate-600 prose-p:leading-relaxed break-words"
         >
           <section>
             <h2 className="text-xl font-semibold text-slate-900">1. Agreement to terms</h2>

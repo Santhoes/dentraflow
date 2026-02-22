@@ -13,6 +13,8 @@ import {
   Building2,
   CalendarX2,
   Copy,
+  Check,
+  X,
 } from "lucide-react";
 import { hasPlanFeature, normalizePlan, getPlanLimit, formatPlanLimit } from "@/lib/plan-features";
 import { COUNTRIES, TIMEZONES } from "@/lib/supabase/types";
@@ -76,6 +78,11 @@ export default function AppLocationsPage() {
   const [locationFormError, setLocationFormError] = useState<string | null>(null);
   const [primaryEditOpen, setPrimaryEditOpen] = useState(false);
   const [primarySaving, setPrimarySaving] = useState(false);
+  const [embedModalOpen, setEmbedModalOpen] = useState(false);
+  const [embedLocationLabel, setEmbedLocationLabel] = useState("");
+  const [embedData, setEmbedData] = useState<{ embedUrl: string; iframeSnippet: string } | null>(null);
+  const [embedLoading, setEmbedLoading] = useState(false);
+  const [embedCopied, setEmbedCopied] = useState<"url" | "snippet" | null>(null);
   const [form, setForm] = useState<{
     name: string;
     address_line1: string;
@@ -156,6 +163,33 @@ export default function AppLocationsPage() {
   useEffect(() => {
     fetchHolidays();
   }, [fetchHolidays]);
+
+  const openEmbed = useCallback((locationId: string | null, label: string) => {
+    setEmbedModalOpen(true);
+    setEmbedLocationLabel(label);
+    setEmbedData(null);
+    setEmbedLoading(true);
+    setEmbedCopied(null);
+    const supabase = createClient();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const token = session?.access_token;
+      if (!token) {
+        setEmbedLoading(false);
+        return;
+      }
+      const url = locationId
+        ? `/api/app/embed-url?location=${encodeURIComponent(locationId)}`
+        : "/api/app/embed-url";
+      fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.embedUrl && data.iframeSnippet) {
+            setEmbedData({ embedUrl: data.embedUrl, iframeSnippet: data.iframeSnippet });
+          }
+        })
+        .finally(() => setEmbedLoading(false));
+    });
+  }, []);
 
   const canAccess = clinic ? hasPlanFeature(clinic.plan, "multiLocation") : false;
 
@@ -395,6 +429,7 @@ export default function AppLocationsPage() {
   };
 
   return (
+    <>
     <LocationsMainContent
       clinic={clinic}
       locations={locations}
@@ -440,6 +475,84 @@ export default function AppLocationsPage() {
       TIMEZONES={TIMEZONES}
       DAYS={DAYS}
       DAY_LABELS={DAY_LABELS}
+      onGetEmbed={canAccess ? openEmbed : undefined}
     />
+
+    {embedModalOpen && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 p-3 sm:p-4"
+        onClick={() => setEmbedModalOpen(false)}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div
+          className="my-auto w-full max-w-lg shrink-0 rounded-xl border border-slate-200 bg-white shadow-xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 sm:px-6">
+            <h3 className="text-lg font-semibold text-slate-900">Chat widget embed — {embedLocationLabel}</h3>
+            <button
+              type="button"
+              onClick={() => setEmbedModalOpen(false)}
+              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+              aria-label="Close"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="p-4 sm:p-6 space-y-4">
+            {embedLoading ? (
+              <div className="flex items-center gap-2 text-sm text-slate-600">
+                <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+              </div>
+            ) : embedData ? (
+              <>
+                <div>
+                  <label className="block text-xs font-medium text-slate-500">Embed URL</label>
+                  <div className="mt-1 flex gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={embedData.embedUrl}
+                      className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(embedData.embedUrl);
+                        setEmbedCopied("url");
+                        setTimeout(() => setEmbedCopied(null), 2000);
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                      {embedCopied === "url" ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                      {embedCopied === "url" ? "Copied" : "Copy"}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-500">Iframe code</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(embedData.iframeSnippet);
+                      setEmbedCopied("snippet");
+                      setTimeout(() => setEmbedCopied(null), 2000);
+                    }}
+                    className="mt-1 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    {embedCopied === "snippet" ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                    {embedCopied === "snippet" ? "Copied" : "Copy iframe code"}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-slate-500">Unable to load embed. Try again later.</p>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+  </>
   );
 }

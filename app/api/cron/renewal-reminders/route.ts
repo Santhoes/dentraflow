@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendResendEmail } from "@/lib/resend";
-import { renderEmailHtml } from "@/lib/email-template";
+import { renderEmailHtml, escapeHtml } from "@/lib/email-template";
 
 /**
  * GET or POST /api/cron/renewal-reminders
@@ -93,7 +93,7 @@ async function run(request: Request) {
       to,
       subject: `DentraFlow — Your ${c.name} plan has expired`,
       html: renderEmailHtml({
-        body: `<p>Your DentraFlow plan for <strong>${c.name}</strong> (${c.plan}) has expired.</p><p>Renew to keep your AI receptionist and chat widget active.</p>`,
+        body: `<p>Your DentraFlow plan for <strong>${escapeHtml(c.name)}</strong> (${escapeHtml(c.plan)}) has expired.</p><p>Renew to keep your AI receptionist and chat widget active.</p>`,
         button: { text: "Renew plan", url: planUrl },
         link: { text: "Visit app", url: `${appUrl}/app` },
       }),
@@ -112,7 +112,7 @@ async function run(request: Request) {
       to,
       subject: `DentraFlow — Plan renewal reminder for ${c.name}`,
       html: renderEmailHtml({
-        body: `<p>This is a reminder that your DentraFlow plan for <strong>${c.name}</strong> (${c.plan}) expires on <strong>${expiresAt}</strong>.</p><p>Renew to keep your AI receptionist running without interruption.</p>`,
+        body: `<p>This is a reminder that your DentraFlow plan for <strong>${escapeHtml(c.name)}</strong> (${escapeHtml(c.plan)}) expires on <strong>${escapeHtml(expiresAt)}</strong>.</p><p>Renew to keep your AI receptionist running without interruption.</p>`,
         button: { text: "Renew plan", url: planUrl },
         link: { text: "View billing", url: planUrl },
       }),

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PLANS, type PlanId } from "@/lib/supabase/types";
+import { getCapturedAmountUsd, verifyCaptureAmountForPlan } from "@/lib/payment-verify";
 
 const PAYPAL_API = "https://api-m.paypal.com";
 
@@ -94,6 +95,32 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Payment not completed" }, { status: 402 });
     }
 
+    const paypalOrderId = captureData.id || orderId;
+    const capturedUsd = getCapturedAmountUsd(captureData);
+    if (capturedUsd == null) {
+      return NextResponse.json({ error: "Could not read capture amount" }, { status: 402 });
+    }
+    const verify = verifyCaptureAmountForPlan(
+      capturedUsd,
+      plan,
+      payerCountry ?? clinicCountry ?? "Other"
+    );
+    if (!verify.ok) {
+      return NextResponse.json({ error: verify.error || "Amount mismatch" }, { status: 400 });
+    }
+
+    const { data: existingPayment } = await admin
+      .from("payments")
+      .select("clinic_id")
+      .eq("paypal_order_id", paypalOrderId)
+      .maybeSingle();
+    if (existingPayment?.clinic_id) {
+      return NextResponse.json({
+        success: true,
+        clinicId: (existingPayment as { clinic_id: string }).clinic_id,
+      });
+    }
+
     const planExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
     const { error: updateError } = await admin
       .from("clinics")
@@ -104,9 +131,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Failed to update plan" }, { status: 500 });
     }
 
-    const paypalOrderId = captureData.id || orderId;
-    const captureAmount = (captureData.purchase_units?.[0]?.payments?.captures?.[0]?.amount as { value?: string } | undefined)?.value;
-    const amount = captureAmount ? parseFloat(captureAmount) : planInfo.priceCents / 100;
+    const amount = capturedUsd;
     const { computePriceWithTax } = await import("@/lib/tax-by-country");
     const { taxCents: taxCentsComputed } = computePriceWithTax(planInfo.priceCents, payerCountry ?? "");
     const taxAmount = taxCentsComputed > 0 ? taxCentsComputed / 100 : null;

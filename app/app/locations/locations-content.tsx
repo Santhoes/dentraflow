@@ -10,6 +10,7 @@ import {
   Loader2,
   Building2,
   CalendarX2,
+  Code2,
 } from "lucide-react";
 import { COUNTRIES, TIMEZONES } from "@/lib/supabase/types";
 import { formatPlanLimit } from "@/lib/plan-features";
@@ -80,6 +81,7 @@ export interface LocationsMainContentProps {
   TIMEZONES: readonly string[];
   DAYS: readonly string[];
   DAY_LABELS: Record<string, string>;
+  onGetEmbed?: (locationId: string | null, label: string) => void;
 }
 
 export function LocationsMainContent(props: LocationsMainContentProps) {
@@ -128,6 +130,7 @@ export function LocationsMainContent(props: LocationsMainContentProps) {
     TIMEZONES: TIMEZONESProp,
     DAYS,
     DAY_LABELS,
+    onGetEmbed,
   } = props;
 
   return (
@@ -153,7 +156,7 @@ export function LocationsMainContent(props: LocationsMainContentProps) {
           <h2 className="font-semibold text-slate-900">{canAccess ? "Your clinics" : "Your clinic"}</h2>
           <p className="text-sm text-slate-600">
             {canAccess
-              ? "Primary is your main clinic. Add branches below. Add AI agents and copy chat embed from the AI Agents page."
+              ? "Primary is your main clinic. Add branches below. Each has its own chat widget embed."
               : "Main clinic address and contact. Used for reminders and booking."}
           </p>
         </div>
@@ -174,6 +177,15 @@ export function LocationsMainContent(props: LocationsMainContentProps) {
                 >
                   <Pencil className="h-4 w-4" />
                 </button>
+                {canAccess && onGetEmbed && (
+                  <button
+                    type="button"
+                    onClick={() => onGetEmbed(null, "Primary")}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                  >
+                    <Code2 className="h-3.5 w-3.5" /> Chat widget
+                  </button>
+                )}
               </div>
               <p className="mt-0.5 text-sm text-slate-600">{formatPrimaryAddress(clinic)}</p>
               {((clinic as { whatsapp_phone?: string | null }).whatsapp_phone || clinic.timezone) && (
@@ -209,6 +221,15 @@ export function LocationsMainContent(props: LocationsMainContentProps) {
                       )}
                     </div>
                     <div className="flex shrink-0 flex-wrap items-center gap-2 sm:gap-2">
+                      {onGetEmbed && (
+                        <button
+                          type="button"
+                          onClick={() => onGetEmbed(loc.id, loc.name)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                        >
+                          <Code2 className="h-3.5 w-3.5" /> Chat widget
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => openEdit(loc)}
@@ -252,7 +273,7 @@ export function LocationsMainContent(props: LocationsMainContentProps) {
                 <MapPin className="mx-auto h-10 w-10 text-amber-600" />
                 <p className="mt-2 text-sm font-medium text-slate-900">Add more branches with Pro or Elite</p>
                 <p className="mt-1 text-sm text-slate-600">
-                  Pro: up to 3 clinics · Elite: unlimited. Each branch gets its own chat embed and AI agent.
+                  Pro: up to 3 clinics · Elite: up to 10. Each branch gets its own chat widget embed.
                 </p>
                 <Link
                   href="/app/plan"
@@ -346,8 +367,16 @@ export function LocationsMainContent(props: LocationsMainContentProps) {
 
       {/* Add/Edit modal */}
       {(modalOpen === "add" || modalOpen === "edit") && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 p-3 sm:p-4">
-          <div className="my-auto w-full max-w-lg shrink-0 rounded-xl border border-slate-200 bg-white shadow-xl max-h-[90vh] flex flex-col">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 p-3 sm:p-4"
+          onClick={() => { clearLocationFormError(); setModalOpen(null); resetForm(); }}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="my-auto w-full max-w-lg shrink-0 rounded-xl border border-slate-200 bg-white shadow-xl max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="shrink-0 border-b border-slate-100 px-4 py-3 sm:px-6">
               <h3 className="text-lg font-semibold text-slate-900">
                 {modalOpen === "add" ? "Add location" : "Edit location"}
@@ -544,8 +573,16 @@ export function LocationsMainContent(props: LocationsMainContentProps) {
 
       {/* Edit primary location modal */}
       {primaryEditOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 p-3 sm:p-4">
-          <div className="my-auto w-full max-w-lg shrink-0 rounded-xl border border-slate-200 bg-white shadow-xl max-h-[90vh] flex flex-col">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 p-3 sm:p-4"
+          onClick={() => setPrimaryEditOpen(false)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="my-auto w-full max-w-lg shrink-0 rounded-xl border border-slate-200 bg-white shadow-xl max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="shrink-0 border-b border-slate-100 px-4 py-3 sm:px-6">
               <h3 className="text-lg font-semibold text-slate-900">Edit primary location</h3>
               <p className="mt-0.5 text-sm text-slate-600">Main clinic name, address, timezone, and WhatsApp number.</p>

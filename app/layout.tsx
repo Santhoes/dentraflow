@@ -91,10 +91,12 @@ function StructuredDataScript() {
     industry: "Healthcare",
   };
 
+  // Escape </script> in JSON to prevent breaking out of the script tag (e.g. if plan descriptions ever contain it)
+  const json = JSON.stringify(structuredData).replace(/<\/script>/gi, "<\\/script>");
   return (
     <script
       type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      dangerouslySetInnerHTML={{ __html: json }}
     />
   );
 }

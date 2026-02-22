@@ -17,7 +17,7 @@ import {
   BarChart3,
   MapPin,
   MessageCircle,
-  Bot,
+  UsersRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { planAtLeast, normalizePlan } from "@/lib/plan-features";
@@ -30,7 +30,7 @@ const NAV_ITEMS: { label: string; href: string; icon: typeof LayoutDashboard; mi
   { label: "Appointments", href: "/app/appointments", icon: Calendar },
   { label: "Patients", href: "/app/patients", icon: Users },
   { label: "Analytics", href: "/app/analytics", icon: BarChart3 },
-  { label: "AI Agents", href: "/app/agents", icon: Bot },
+  { label: "Team", href: "/app/team", icon: UsersRound, minPlan: "pro" },
   { label: "Clinics", href: "/app/locations", icon: MapPin },
   { label: "Support", href: "/app/support", icon: MessageCircle },
   { label: "Plan & Billing", href: "/app/plan", icon: CreditCard },
@@ -104,7 +104,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
           <button
             type="button"
             onClick={() => setSidebarOpen((o) => !o)}
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 active:bg-slate-200 lg:hidden"
+            className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 active:bg-slate-200 lg:hidden touch-manipulation"
             aria-label="Toggle menu"
           >
             {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -121,7 +121,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               onClick={handleSignOut}
-              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 active:bg-slate-200"
+              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 active:bg-slate-200 touch-manipulation sm:min-w-0"
             >
               <LogOut className="h-4 w-4 shrink-0" /> <span className="hidden sm:inline">Sign out</span>
             </button>
@@ -145,7 +145,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
                   href={item.href}
                   onClick={() => setSidebarOpen(false)}
                   className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-150",
+                    "flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-150 touch-manipulation",
                     isActive ? "bg-primary/10 text-primary" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 active:bg-slate-200"
                   )}
                 >
