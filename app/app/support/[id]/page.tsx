@@ -19,12 +19,21 @@ interface SupportCase {
   status?: string | null;
 }
 
+interface SupportReply {
+  id: string;
+  case_id: string;
+  from_role: "user" | "admin";
+  body: string;
+  created_at: string;
+}
+
 export default function SupportCaseDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { clinic, user } = useApp();
   const id = typeof params?.id === "string" ? params.id : "";
   const [caseData, setCaseData] = useState<SupportCase | null>(null);
+  const [replies, setReplies] = useState<SupportReply[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -32,6 +41,8 @@ export default function SupportCaseDetailPage() {
   const [editBody, setEditBody] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const [sendingReply, setSendingReply] = useState(false);
 
   const fetchCase = useCallback(async () => {
     if (!id) return;
@@ -57,11 +68,59 @@ export default function SupportCaseDetailPage() {
     }
   }, [id]);
 
+  const fetchReplies = useCallback(async () => {
+    if (!id) return;
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("support_replies")
+      .select("id, case_id, from_role, body, created_at")
+      .eq("case_id", id)
+      .order("created_at", { ascending: true });
+    if (!error) setReplies((data as SupportReply[]) ?? []);
+  }, [id]);
+
   useEffect(() => {
     fetchCase();
   }, [fetchCase]);
 
+  useEffect(() => {
+    if (id && caseData) fetchReplies();
+  }, [id, caseData, fetchReplies]);
+
   const canEditDelete = caseData && user && caseData.user_id === user.id && caseData.admin_reply == null;
+
+  const handleSendReply = async () => {
+    if (!id || !replyText.trim()) return;
+    setSendingReply(true);
+    setError(null);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) {
+        setError("Please sign in again.");
+        setSendingReply(false);
+        return;
+      }
+      const res = await fetch(`/api/app/support/${id}/reply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ message: replyText.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "Failed to send.");
+        setSendingReply(false);
+        return;
+      }
+      setReplyText("");
+      await fetchReplies();
+      await fetchCase();
+    } catch {
+      setError("Failed to send.");
+    }
+    setSendingReply(false);
+  };
 
   const handleSaveEdit = async () => {
     if (!id || !caseData) return;
@@ -190,7 +249,7 @@ export default function SupportCaseDetailPage() {
         </div>
 
         <div className="divide-y divide-slate-100">
-          {/* User message */}
+          {/* Initial user message */}
           <div className="px-4 py-4 sm:px-6">
             <p className="text-xs font-medium text-slate-500">Your message</p>
             {editing ? (
@@ -251,10 +310,13 @@ export default function SupportCaseDetailPage() {
                 )}
               </>
             )}
+            <p className="mt-1 text-xs text-slate-400">
+              {new Date(caseData.created_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+            </p>
           </div>
 
-          {/* Admin reply */}
-          {caseData.admin_reply && (
+          {/* Legacy admin reply (only when no admin replies in thread yet) */}
+          {caseData.admin_reply && !replies.some((r) => r.from_role === "admin") && (
             <div className="px-4 py-4 sm:px-6 bg-emerald-50/50">
               <p className="text-xs font-medium text-slate-500">
                 Reply from DentraFlow
@@ -265,6 +327,47 @@ export default function SupportCaseDetailPage() {
               <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">{caseData.admin_reply}</p>
             </div>
           )}
+
+          {/* Thread replies */}
+          {replies.map((r) => (
+            <div
+              key={r.id}
+              className={r.from_role === "admin" ? "px-4 py-4 sm:px-6 bg-emerald-50/50" : "px-4 py-4 sm:px-6"}
+            >
+              <p className="text-xs font-medium text-slate-500">
+                {r.from_role === "admin" ? "Reply from DentraFlow" : "You"}
+                {" · "}
+                {new Date(r.created_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+              </p>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">{r.body}</p>
+            </div>
+          ))}
+
+          {/* Continue conversation */}
+          <div className="px-4 py-4 sm:px-6 border-t border-slate-100">
+            <p className="text-xs font-medium text-slate-600 mb-2">Continue conversation</p>
+            <div className="flex gap-2">
+              <textarea
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                placeholder="Add a message..."
+                rows={2}
+                className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              <button
+                type="button"
+                onClick={handleSendReply}
+                disabled={sendingReply || !replyText.trim()}
+                className="self-end inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50"
+              >
+                {sendingReply ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                Send
+              </button>
+            </div>
+            {caseData.status === "closed" && (
+              <p className="mt-1.5 text-xs text-slate-500">Sending a message will reopen this case.</p>
+            )}
+          </div>
         </div>
       </div>
 

@@ -41,9 +41,15 @@ export async function GET(
   }
   const clinics = await admin.from("clinics").select("id, name");
   const clinicMap = new Map((clinics.data || []).map((c: { id: string; name: string }) => [c.id, c.name]));
+  const { data: replies } = await admin
+    .from("support_replies")
+    .select("id, from_role, body, created_at")
+    .eq("case_id", id)
+    .order("created_at", { ascending: true });
   return NextResponse.json({
     ...data,
     clinic_name: clinicMap.get((data.clinic_id as string)) ?? "—",
+    replies: Array.isArray(replies) ? replies : [],
   });
 }
 
@@ -78,6 +84,19 @@ export async function PATCH(
     return NextResponse.json({ error: "Provide admin_reply and/or status" }, { status: 400 });
 
   const admin = createAdminClient();
+  if (typeof updates.admin_reply === "string") {
+    const { error: replyErr } = await admin.from("support_replies").insert({
+      case_id: id,
+      from_role: "admin",
+      user_id: null,
+      body: updates.admin_reply,
+    });
+    if (replyErr) {
+      if (!replyErr.message?.includes("support_replies") && !replyErr.message?.includes("relation")) {
+        console.error("admin support_replies insert", replyErr);
+      }
+    }
+  }
   let result = await admin.from("support_messages").update(updates).eq("id", id).select().single();
   if (result.error && (result.error.message?.includes("status") || result.error.message?.includes("column"))) {
     const fallbackUpdates: { admin_reply?: string | null; admin_replied_at?: string } = {};

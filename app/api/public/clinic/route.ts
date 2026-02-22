@@ -17,6 +17,12 @@ export async function GET(request: Request) {
   if (!slug) {
     return NextResponse.json({ error: "Missing slug" }, { status: 400 });
   }
+  if (slug.toLowerCase() === "demo") {
+    return NextResponse.json(
+      { error: "Use your clinic's embed URL from App → Locations → embed.", code: "USE_CLINIC_EMBED" },
+      { status: 404 }
+    );
+  }
   if (!sig || !verifyClinicSignature(slug, sig)) {
     return NextResponse.json({ error: "Invalid or missing signature" }, { status: 403 });
   }

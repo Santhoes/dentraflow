@@ -6,6 +6,13 @@ import { useParams } from "next/navigation";
 import { adminFetch } from "@/lib/admin-api";
 import { ArrowLeft, Loader2, Send } from "lucide-react";
 
+interface SupportReplyRow {
+  id: string;
+  from_role: "user" | "admin";
+  body: string;
+  created_at: string;
+}
+
 interface SupportCaseRow {
   id: string;
   clinic_id: string;
@@ -17,6 +24,7 @@ interface SupportCaseRow {
   admin_reply: string | null;
   admin_replied_at: string | null;
   status: string;
+  replies?: SupportReplyRow[];
 }
 
 export default function AdminSupportCasePage() {
@@ -36,7 +44,6 @@ export default function AdminSupportCasePage() {
     try {
       const data = await adminFetch(`/support-messages/${id}`) as SupportCaseRow;
       setCaseData(data);
-      setReplyText(data.admin_reply ?? "");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load");
       setCaseData(null);
@@ -58,6 +65,7 @@ export default function AdminSupportCasePage() {
         method: "PATCH",
         body: JSON.stringify({ admin_reply: replyText.trim() }),
       });
+      setReplyText("");
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save reply");
@@ -153,8 +161,12 @@ export default function AdminSupportCasePage() {
         </div>
 
         <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">{caseData.body}</p>
+        <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+          {new Date(caseData.created_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+        </p>
 
-        {caseData.admin_reply && (
+        {/* Legacy single admin reply (when no thread replies yet) */}
+        {caseData.admin_reply && !(caseData.replies?.some((r) => r.from_role === "admin")) && (
           <div className="mt-4 border-t border-slate-200 pt-4 dark:border-slate-600">
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Admin reply</p>
             {caseData.admin_replied_at && (
@@ -163,6 +175,25 @@ export default function AdminSupportCasePage() {
               </p>
             )}
             <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">{caseData.admin_reply}</p>
+          </div>
+        )}
+
+        {/* Thread replies */}
+        {(caseData.replies?.length ?? 0) > 0 && (
+          <div className="mt-4 space-y-3 border-t border-slate-200 pt-4 dark:border-slate-600">
+            {caseData.replies!.map((r) => (
+              <div
+                key={r.id}
+                className={r.from_role === "admin" ? "rounded-lg bg-emerald-50/60 dark:bg-emerald-900/20 p-3" : "rounded-lg bg-slate-50 dark:bg-slate-700/50 p-3"}
+              >
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  {r.from_role === "admin" ? "DentraFlow" : "Clinic"}
+                  {" · "}
+                  {new Date(r.created_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+                </p>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">{r.body}</p>
+              </div>
+            ))}
           </div>
         )}
 
@@ -179,7 +210,7 @@ export default function AdminSupportCasePage() {
         </div>
 
         <div className="mt-4 border-t border-slate-200 pt-4 dark:border-slate-600">
-          <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">Reply to user</label>
+          <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">Add reply</label>
           <textarea
             value={replyText}
             onChange={(e) => setReplyText(e.target.value)}
@@ -195,7 +226,7 @@ export default function AdminSupportCasePage() {
               className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              Save reply
+              Send reply
             </button>
           </div>
         </div>

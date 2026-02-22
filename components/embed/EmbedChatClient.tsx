@@ -49,7 +49,8 @@ export function EmbedChatClient({ slug, sig, locationId, agentId }: EmbedChatCli
         if (cancelled) return;
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
-          setError(data.error || "Clinic not found");
+          const msg = data.code === "USE_CLINIC_EMBED" ? data.error : (data.error || "Clinic not found");
+          setError(msg);
           setClinic(null);
           setLoading(false);
           return;
