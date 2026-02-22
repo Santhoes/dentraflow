@@ -16,6 +16,7 @@ interface SupportCase {
   created_at: string;
   admin_reply: string | null;
   admin_replied_at: string | null;
+  status?: string | null;
 }
 
 export default function SupportCaseDetailPage() {
@@ -40,7 +41,7 @@ export default function SupportCaseDetailPage() {
       const supabase = createClient();
       const { data, error: e } = await supabase
         .from("support_messages")
-        .select("id, clinic_id, user_id, subject, body, created_at, admin_reply, admin_replied_at")
+        .select("id, clinic_id, user_id, subject, body, created_at, admin_reply, admin_replied_at, status")
         .eq("id", id)
         .single();
       if (e) {
@@ -171,10 +172,17 @@ export default function SupportCaseDetailPage() {
               {caseData.subject || "Support request"}
             </h1>
             <span
-              className={caseData.admin_reply ? "text-xs text-emerald-600" : "text-xs text-amber-600"}
+              className={
+                caseData.status === "closed"
+                  ? "text-xs text-slate-500"
+                  : "text-xs text-amber-600"
+              }
             >
-              {caseData.admin_reply ? "Replied" : "Open"}
+              {caseData.status === "closed" ? "Closed" : "Open"}
             </span>
+            {caseData.admin_reply && (
+              <span className="text-xs text-emerald-600"> · Replied</span>
+            )}
           </div>
           <p className="mt-0.5 text-sm text-slate-500">
             Opened {new Date(caseData.created_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}

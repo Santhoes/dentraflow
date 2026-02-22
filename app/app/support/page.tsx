@@ -13,6 +13,7 @@ interface SupportCase {
   created_at: string;
   admin_reply: string | null;
   admin_replied_at: string | null;
+  status?: string | null;
 }
 
 export default function AppSupportPage() {
@@ -29,7 +30,7 @@ export default function AppSupportPage() {
     const supabase = createClient();
     const { data, error: e } = await supabase
       .from("support_messages")
-      .select("id, subject, body, created_at, admin_reply, admin_replied_at")
+      .select("id, subject, body, created_at, admin_reply, admin_replied_at, status")
       .order("created_at", { ascending: false })
       .limit(100);
     if (!e && data) setCases((data as SupportCase[]));
@@ -180,12 +181,19 @@ export default function AppSupportPage() {
                         timeStyle: "short",
                       })}
                     </span>
-                    <div className="mt-0.5">
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
                       <span
-                        className={c.admin_reply ? "text-xs text-emerald-600" : "text-xs text-amber-600"}
+                        className={
+                          c.status === "closed"
+                            ? "text-slate-500"
+                            : "text-amber-600"
+                        }
                       >
-                        {c.admin_reply ? "Replied" : "Open"}
+                        {c.status === "closed" ? "Closed" : "Open"}
                       </span>
+                      {c.admin_reply && (
+                        <span className="text-emerald-600">Replied</span>
+                      )}
                     </div>
                   </div>
                   <ChevronRight className="h-5 w-5 shrink-0 text-slate-400" />

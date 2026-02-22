@@ -507,6 +507,9 @@ export default function AppLocationsPage() {
               </div>
             ) : embedData ? (
               <>
+                <p className="text-sm text-slate-600">
+                  Use this URL on your website. It is specific to your clinic — only this link will load your chat widget.
+                </p>
                 <div>
                   <label className="block text-xs font-medium text-slate-500">Embed URL</label>
                   <div className="mt-1 flex gap-2">

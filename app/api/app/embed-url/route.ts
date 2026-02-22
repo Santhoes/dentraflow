@@ -52,7 +52,7 @@ export async function GET(request: Request) {
   const locationId = searchParams.get("location")?.trim() || null;
   const agentId = searchParams.get("agent")?.trim() || null;
 
-  const base = process.env.NEXT_PUBLIC_APP_URL || "https://dentraflow.com";
+  const base = (process.env.NEXT_PUBLIC_APP_URL || "https://www.dentraflow.com").replace(/\/$/, "");
   let embedUrl = `${base}/embed/chat?clinic=${encodeURIComponent(clinic.slug)}&sig=${sig}`;
   if (agentId) {
     const { data: agent } = await admin
