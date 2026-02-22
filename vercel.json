@@ -1,7 +1,15 @@
 {
   "crons": [
-    { "path": "/api/cron/renewal-reminders", "schedule": "0 9 * * *" },
-    { "path": "/api/cron/appointment-reminders", "schedule": "0 8 * * *" },
-    { "path": "/api/cron/appointment-reminders", "schedule": "0 14 * * *" }
+    {"path": "/api/cron/renewal-reminders", "schedule": "0 9 * * *"},
+    {"path": "/api/cron/appointment-reminders", "schedule": "0 8 * * *"},
+    {"path": "/api/cron/appointment-reminders", "schedule": "0 14 * * *"}
+  ],
+  "headers": [
+    {
+      "source": "/embed/(.*)",
+      "headers": [
+        { "key": "Content-Security-Policy", "value": "frame-ancestors 'self' https: http:" }
+      ]
+    }
   ]
 }
