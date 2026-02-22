@@ -78,6 +78,7 @@ export async function GET(request: Request) {
   <iframe
     src="${embedUrl}"
     title="Chat with us"
+    allow="clipboard-write"
     style="width:min(360px,100vw);height:min(480px,75vh);border:none;display:block;border-radius:0;box-shadow:0 -4px 24px rgba(0,0,0,0.12);pointer-events:auto;"
   ></iframe>
 </div>`;

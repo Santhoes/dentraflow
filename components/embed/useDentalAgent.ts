@@ -122,10 +122,15 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
   const [verifyAttemptCount, setVerifyAttemptCount] = useState(0);
   const [bookingFailCount, setBookingFailCount] = useState(0);
 
-  const baseUrl =
-    (typeof window !== "undefined" ? window.location.origin : "") ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    "https://www.dentraflow.com";
+  const isEmbed =
+    typeof window !== "undefined" &&
+    typeof (window as { location?: { pathname?: string } }).location?.pathname === "string" &&
+    (window as { location: { pathname: string } }).location.pathname.startsWith("/embed");
+  const baseUrl = isEmbed
+    ? (process.env.NEXT_PUBLIC_APP_URL || "https://www.dentraflow.com").replace(/\/$/, "")
+    : ((typeof window !== "undefined" ? window.location.origin : "") ||
+        process.env.NEXT_PUBLIC_APP_URL ||
+        "https://www.dentraflow.com").replace(/\/$/, "");
 
   const appendMessage = useCallback((role: "user" | "ai", text: string) => {
     setMessages((prev) => [...prev, { id: String(Date.now()), role, text }]);

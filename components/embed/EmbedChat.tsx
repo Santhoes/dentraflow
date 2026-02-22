@@ -139,11 +139,16 @@ export function EmbedChat({ clinicName, locationName, agentName, agentId, clinic
     }));
 
     try {
-      const base =
-        (typeof window !== "undefined" ? window.location.origin : "") ||
-        process.env.NEXT_PUBLIC_APP_URL ||
-        "https://www.dentraflow.com";
-      const res = await fetch(`${base.replace(/\/$/, "")}/api/embed/chat`, {
+      const isEmbed =
+        typeof window !== "undefined" &&
+        typeof window.location?.pathname === "string" &&
+        window.location.pathname.startsWith("/embed");
+      const base = isEmbed
+        ? (process.env.NEXT_PUBLIC_APP_URL || "https://www.dentraflow.com").replace(/\/$/, "")
+        : ((typeof window !== "undefined" ? window.location.origin : "") ||
+            process.env.NEXT_PUBLIC_APP_URL ||
+            "https://www.dentraflow.com").replace(/\/$/, "");
+      const res = await fetch(`${base}/api/embed/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

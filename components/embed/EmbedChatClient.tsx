@@ -41,11 +41,17 @@ export function EmbedChatClient({ slug, sig, locationId, agentId }: EmbedChatCli
     let cancelled = false;
     (async () => {
       try {
-        const base =
-          (typeof window !== "undefined" ? window.location.origin : "") ||
-          process.env.NEXT_PUBLIC_APP_URL ||
-          "https://www.dentraflow.com";
-        let url = `${base.replace(/\/$/, "")}/api/public/clinic?slug=${encodeURIComponent(slug)}&sig=${encodeURIComponent(sig)}`;
+        // Use canonical app URL when on embed path so widget works when embedded on other sites
+        const isEmbed =
+          typeof window !== "undefined" &&
+          typeof window.location?.pathname === "string" &&
+          window.location.pathname.startsWith("/embed");
+        const base = isEmbed
+          ? (process.env.NEXT_PUBLIC_APP_URL || "https://www.dentraflow.com").replace(/\/$/, "")
+          : ((typeof window !== "undefined" ? window.location.origin : "") ||
+              process.env.NEXT_PUBLIC_APP_URL ||
+              "https://www.dentraflow.com").replace(/\/$/, "");
+        let url = `${base}/api/public/clinic?slug=${encodeURIComponent(slug)}&sig=${encodeURIComponent(sig)}`;
         if (agentId) url += `&agent=${encodeURIComponent(agentId)}`;
         else if (locationId) url += `&location=${encodeURIComponent(locationId)}`;
         const res = await fetch(url);

@@ -227,12 +227,17 @@ export function ChatWidget(config: ChatWidgetConfig) {
       const chatHistory = [...messages, userMsg].map((m) => ({ role: m.role, content: m.text }));
 
       try {
-        const base =
-          (typeof window !== "undefined" ? window.location.origin : "") ||
-          process.env.NEXT_PUBLIC_APP_URL ||
-          "https://www.dentraflow.com";
+        const isEmbed =
+          typeof window !== "undefined" &&
+          typeof window.location?.pathname === "string" &&
+          window.location.pathname.startsWith("/embed");
+        const base = isEmbed
+          ? (process.env.NEXT_PUBLIC_APP_URL || "https://www.dentraflow.com").replace(/\/$/, "")
+          : ((typeof window !== "undefined" ? window.location.origin : "") ||
+              process.env.NEXT_PUBLIC_APP_URL ||
+              "https://www.dentraflow.com").replace(/\/$/, "");
         const selectedDate = extractSelectedDateFromMessages(messages);
-        const res = await fetch(`${base.replace(/\/$/, "")}/api/embed/chat`, {
+        const res = await fetch(`${base}/api/embed/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
