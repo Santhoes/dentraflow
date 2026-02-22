@@ -129,7 +129,7 @@ export function DentalChat(config: DentalChatConfig) {
     key: s.key,
     label: s.label,
     value: s.value,
-    variant: s.variant as "default" | "danger" | undefined,
+    variant: s.variant as "default" | "danger" | "secondary" | "primary" | undefined,
   }));
 
   const showSuggestions = suggestionItems.length > 0 || isLoadingSlots;

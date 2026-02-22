@@ -4,6 +4,7 @@ import { verifyClinicSignature } from "@/lib/chat-signature";
 import { sendResendEmail } from "@/lib/resend";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import { hasPlanFeature } from "@/lib/plan-features";
+import { renderEmailHtml, escapeHtml } from "@/lib/email-template";
 
 /**
  * POST /api/embed/modify-cancel — modify or cancel appointment from chat. Requires valid sig.
@@ -148,7 +149,11 @@ export async function POST(request: Request) {
       sendResendEmail({
         to: patientEmail,
         subject: `Appointment cancelled — ${clinicName}`,
-        html: `<p>Hi${patientName ? ` ${patientName}` : ""},</p><p>Your appointment at <strong>${clinicName}</strong> on ${startDate} has been cancelled.</p><p>— ${clinicName}</p>`,
+        html: renderEmailHtml({
+          greeting: `Hi${patientName ? ` ${escapeHtml(patientName)}` : ""},`,
+          body: `<p>Your appointment at <strong>${escapeHtml(clinicName)}</strong> on ${escapeHtml(startDate)} has been cancelled.</p>`,
+          footer: `— ${escapeHtml(clinicName)}`,
+        }),
       }).catch((e) => console.error("Cancel email error:", e));
     }
     const clinicPlan = (clinic as { plan?: string }).plan;
@@ -177,7 +182,11 @@ export async function POST(request: Request) {
       sendResendEmail({
         to: patientEmail,
         subject: `Appointment rescheduled — ${clinicName}`,
-        html: `<p>Hi${patientName ? ` ${patientName}` : ""},</p><p>Your appointment at <strong>${clinicName}</strong> has been rescheduled.</p><p><strong>New time:</strong> ${newStartDate} – ${newEndTime}</p><p>— ${clinicName}</p>`,
+        html: renderEmailHtml({
+          greeting: `Hi${patientName ? ` ${escapeHtml(patientName)}` : ""},`,
+          body: `<p>Your appointment at <strong>${escapeHtml(clinicName)}</strong> has been rescheduled.</p><p><strong>New time:</strong> ${escapeHtml(newStartDate)} – ${escapeHtml(newEndTime)}</p>`,
+          footer: `— ${escapeHtml(clinicName)}`,
+        }),
       }).catch((e) => console.error("Reschedule email error:", e));
     }
     const clinicPlan = (clinic as { plan?: string }).plan;

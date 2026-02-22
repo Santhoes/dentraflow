@@ -82,6 +82,13 @@ body {
   .responsive-stack {
     @apply flex flex-col gap-4 sm:gap-6;
   }
+  .scrollbar-hide {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 @keyframes pageEnter {

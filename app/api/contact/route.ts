@@ -1,19 +1,11 @@
 import { NextResponse } from "next/server";
 import { sendResendEmail } from "@/lib/resend";
 import { checkContactRateLimit, getClientIp } from "@/lib/contact-rate-limit";
+import { renderEmailHtml, escapeHtml } from "@/lib/email-template";
 
 const MAX_NAME = 200;
 const MAX_MESSAGE = 5000;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
 
 /**
  * POST /api/contact — public contact form. Sends email to CONTACT_EMAIL or support@dentraflow.com.
@@ -50,12 +42,16 @@ export async function POST(request: Request) {
 
   const to = process.env.CONTACT_EMAIL || "support@dentraflow.com";
   const subject = `Contact form: ${escapeHtml(name).slice(0, 80)}`;
-  const html = `
-    <p><strong>Name:</strong> ${escapeHtml(name)}</p>
-    <p><strong>Email:</strong> ${escapeHtml(email)}</p>
-    <p><strong>Message:</strong></p>
-    <p>${escapeHtml(message).replace(/\n/g, "<br>")}</p>
-  `;
+  const html = renderEmailHtml({
+    greeting: "New contact form submission",
+    body: `
+      <p><strong>Name:</strong> ${escapeHtml(name)}</p>
+      <p><strong>Email:</strong> ${escapeHtml(email)}</p>
+      <p><strong>Message:</strong></p>
+      <p>${escapeHtml(message).replace(/\n/g, "<br>")}</p>
+    `,
+    footer: "— DentraFlow Contact Form",
+  });
 
   const result = await sendResendEmail({ to, subject, html });
   if (!result.ok) {

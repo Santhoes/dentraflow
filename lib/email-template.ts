@@ -36,10 +36,37 @@ export interface EmailTemplateOptions {
 
 export function renderEmailHtml(options: EmailTemplateOptions): string {
   const { greeting = "Hi,", body, button, link, footer = "— DentraFlow" } = options;
-  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://dentraflow.com").replace(/\/$/, "");
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://www.dentraflow.com").replace(/\/$/, "");
+  const logoUrl = `${baseUrl}/logo.png`;
   const safeGreeting = escapeHtml(greeting);
   const safeBody = body;
   const safeFooter = escapeHtml(footer);
+
+  const headerHtml = `
+    <tr>
+      <td style="padding: 24px 24px 16px; border-bottom: 1px solid #e2e8f0;">
+        <table cellpadding="0" cellspacing="0" role="presentation" width="100%">
+          <tr>
+            <td style="vertical-align: middle;">
+              <img src="${escapeHtml(logoUrl)}" alt="DentraFlow" width="40" height="40" style="display: block; width: 40px; height: 40px; border-radius: 8px;" />
+            </td>
+            <td style="vertical-align: middle; padding-left: 12px;">
+              <p style="margin: 0; font-size: 18px; font-weight: 700; color: #0f172a;">DentraFlow</p>
+              <p style="margin: 2px 0 0; font-size: 12px; color: #64748b;">AI Dental Receptionist for 24/7 Appointment Booking</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  `;
+
+  const footerDetailsHtml = `
+    <p style="margin: 16px 0 0; font-size: 12px; color: #94a3b8;">
+      <a href="${escapeHtml(baseUrl)}" style="color: #94a3b8; text-decoration: none;">www.dentraflow.com</a>
+      &nbsp;·&nbsp;
+      <a href="mailto:support@dentraflow.com" style="color: #94a3b8; text-decoration: none;">support@dentraflow.com</a>
+    </p>
+  `;
 
   const buttonHtml = button
     ? `
@@ -72,8 +99,9 @@ export function renderEmailHtml(options: EmailTemplateOptions): string {
     <tr>
       <td align="center">
         <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width: 560px; background-color: #ffffff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow: hidden;">
+          ${headerHtml}
           <tr>
-            <td style="padding: 32px 24px;">
+            <td style="padding: 24px 24px 32px;">
               <p style="margin: 0 0 16px; font-size: 16px;">${safeGreeting}</p>
               <div style="margin: 0 0 24px; font-size: 15px;">
                 ${safeBody}
@@ -81,11 +109,12 @@ export function renderEmailHtml(options: EmailTemplateOptions): string {
               ${buttonHtml}
               ${linkHtml}
               <p style="margin: 24px 0 0; font-size: 14px; color: #64748b;">${safeFooter}</p>
+              ${footerDetailsHtml}
             </td>
           </tr>
         </table>
-        <p style="margin: 16px 0 0; font-size: 12px; color: #94a3b8;">
-          <a href="${escapeHtml(baseUrl)}" style="color: #94a3b8; text-decoration: none;">DentraFlow</a> — AI Dental Receptionist
+        <p style="margin: 16px 0 0; font-size: 11px; color: #94a3b8;">
+          © ${new Date().getFullYear()} DentraFlow. All rights reserved.
         </p>
       </td>
     </tr>

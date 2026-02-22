@@ -375,6 +375,20 @@ export default function AppPlanPage() {
               </div>
             );
           })()}
+          {!isExpired && clinic.plan && planInfo && planInfo.priceCents > 0 && (
+            <div className="mt-4 space-y-2">
+              <p className="text-sm text-slate-600">Renew early to extend your plan. You won&apos;t be charged again if payment was already completed.</p>
+              <button
+                type="button"
+                onClick={handleRenew}
+                disabled={renewing}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg border-2 border-primary bg-white px-4 py-2 text-sm font-medium text-primary hover:bg-primary/5 disabled:opacity-50 sm:w-auto"
+              >
+                {renewing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                Pay in advance
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

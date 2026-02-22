@@ -21,7 +21,7 @@ export interface SuggestionItem {
   key: string;
   label: string;
   value?: string;
-  variant?: "default" | "danger";
+  variant?: "default" | "danger" | "secondary" | "primary";
 }
 
 export interface ChatMessage {
@@ -141,17 +141,18 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
   }, []);
 
   const greetingSuggestions: SuggestionItem[] = [
-    { key: "book", label: "Book Appointment" },
+    { key: "book", label: "Book Appointment", variant: "primary" },
     { key: "change_cancel", label: "Change / Cancel" },
     { key: "clinic_info", label: "Clinic Info" },
     { key: "emergency", label: "EMERGENCY", variant: "danger" },
   ];
 
   // Initialize suggestions for GREETING; BOOKING_TIME shows slots + Back (no duplicate)
+  const backChip: SuggestionItem = { key: "back", label: "Back", variant: "secondary" };
   const bookingTimeSuggestions =
     slotSuggestions.some((s) => s.key === "back")
       ? slotSuggestions
-      : [...slotSuggestions, { key: "back", label: "Back" }];
+      : [...slotSuggestions.map((s) => ({ ...s, variant: "primary" as const })), backChip];
   const displaySuggestions =
     currentState === "GREETING" && suggestions.length === 0
       ? greetingSuggestions
@@ -230,14 +231,14 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
             const loc = [clinicInfo.address, clinicInfo.landmark].filter(Boolean).join(". ") || "";
             const msg = `We're at ${loc || "our clinic"}. Hours: ${hours}. Book?`;
             setStateWithMessageAndSuggestions("CLINIC_INFO", msg, [
-              { key: "book", label: "Book Appointment" },
-              { key: "back", label: "Back" },
+              { key: "book", label: "Book Appointment", variant: "primary" },
+              backChip,
             ]);
           } else if (key === "emergency") {
             const phone = clinicInfo.whatsapp_phone || clinicInfo.phone || "";
             const phoneStr = typeof phone === "string" && phone ? phone : "the clinic";
             const msg = `Call us now: ${phoneStr}. Tooth out? Keep in milk. Bleeding? Use gauze.`;
-            setStateWithMessageAndSuggestions("EMERGENCY", msg, [{ key: "back", label: "Back" }]);
+            setStateWithMessageAndSuggestions("EMERGENCY", msg, [backChip]);
           }
           break;
 
@@ -246,8 +247,8 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
           setStateWithMessageAndSuggestions("BOOKING_DATE", "When would you like to come? Pick a day.", []);
           setIsLoadingSlots(true);
           fetchWorkingDays().then((dateChips) => {
-            setStateOnlySuggestions("BOOKING_DATE", [...dateChips, { key: "back", label: "Back" }]);
-            setSuggestions([...dateChips, { key: "back", label: "Back" }]);
+            setStateOnlySuggestions("BOOKING_DATE", [...dateChips, backChip]);
+            setSuggestions([...dateChips, backChip]);
             setIsLoadingSlots(false);
           });
           break;
@@ -266,11 +267,11 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
           if (slotList.length === 0) {
             setMessage("No slots available for this day. Pick another date.");
             appendMessage("ai", "No slots available for this day. Pick another date.");
-            const backOnly = [{ key: "back", label: "Back" }];
+            const backOnly: SuggestionItem[] = [backChip];
             setSlotSuggestions(backOnly);
             setStateOnlySuggestions("BOOKING_TIME", backOnly);
           } else {
-            setSlotSuggestions(slotList.map((s) => ({ key: s.key, label: s.label, value: s.value })));
+            setSlotSuggestions(slotList.map((s) => ({ ...s, variant: "primary" as const })));
             setStateOnlySuggestions("BOOKING_TIME", []);
             setMessage(MSG_CHOOSE_SLOT);
             appendMessage("ai", MSG_CHOOSE_SLOT);
@@ -353,8 +354,8 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
             setVerifyAttemptCount(nextAttempt);
             if (nextAttempt >= 3) {
               setStateWithMessageAndSuggestions("VERIFY_ACCOUNT", apiError ?? "No booking found for this email. You can book a new appointment or go back.", [
-                { key: "book", label: "Book Appointment" },
-                { key: "back", label: "Back" },
+                { key: "book", label: "Book Appointment", variant: "primary" },
+                backChip,
               ]);
             } else {
               const tryAgainMsg = apiError ?? `Email not found. Please try again (${nextAttempt} of 3).`;
@@ -366,8 +367,8 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
           setVerifyAttemptCount(nextAttempt);
           if (nextAttempt >= 3) {
             setStateWithMessageAndSuggestions("VERIFY_ACCOUNT", "Something went wrong. You can book a new appointment or go back.", [
-              { key: "book", label: "Book Appointment" },
-              { key: "back", label: "Back" },
+              { key: "book", label: "Book Appointment", variant: "primary" },
+              backChip,
             ]);
           } else {
             setStateWithMessageAndSuggestions(
@@ -445,8 +446,8 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
             const msg = `You're booked for ${startStr}. Confirmation sent by email.`;
             setMessage(msg);
             const successChips: SuggestionItem[] = [
-              { key: "book_another", label: "Book another" },
-              { key: "back", label: "Back" },
+              { key: "book_another", label: "Book another", variant: "primary" },
+              backChip,
             ];
             if (isProOrElite && selectedSlot?.start && selectedSlot?.end) {
               const gcalUrl = buildGoogleCalendarUrl({
@@ -516,8 +517,8 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
             setCurrentState("CANCEL_SUCCESS");
             setMessage(MSG_CANCELLED);
             setSuggestions([
-              { key: "book", label: "Book Appointment" },
-              { key: "back", label: "Back" },
+              { key: "book", label: "Book Appointment", variant: "primary" },
+              backChip,
             ]);
             appendMessage("ai", MSG_CANCELLED);
             setVerifiedAppointments([]);
@@ -594,8 +595,8 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
           setSuggestions([]);
           appendMessage("ai", "When would you like to come? Pick a day.");
           fetchWorkingDays().then((dateChips) => {
-            setStateOnlySuggestions("BOOKING_DATE", [...dateChips, { key: "back", label: "Back" }]);
-            setSuggestions([...dateChips, { key: "back", label: "Back" }]);
+            setStateOnlySuggestions("BOOKING_DATE", [...dateChips, backChip]);
+            setSuggestions([...dateChips, backChip]);
           });
           return;
         }
@@ -622,8 +623,8 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
         setMessage("When would you like to come? Pick a day.");
         appendMessage("ai", "When would you like to come? Pick a day.");
         fetchWorkingDays().then((dateChips) => {
-          setStateOnlySuggestions("BOOKING_DATE", [...dateChips, { key: "back", label: "Back" }]);
-          setSuggestions([...dateChips, { key: "back", label: "Back" }]);
+          setStateOnlySuggestions("BOOKING_DATE", [...dateChips, backChip]);
+          setSuggestions([...dateChips, backChip]);
         });
         return;
       }
