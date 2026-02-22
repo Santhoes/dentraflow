@@ -41,8 +41,11 @@ export function EmbedChatClient({ slug, sig, locationId, agentId }: EmbedChatCli
     let cancelled = false;
     (async () => {
       try {
-        const base = typeof window !== "undefined" ? window.location.origin : "";
-        let url = `${base}/api/public/clinic?slug=${encodeURIComponent(slug)}&sig=${encodeURIComponent(sig)}`;
+        const base =
+          (typeof window !== "undefined" ? window.location.origin : "") ||
+          process.env.NEXT_PUBLIC_APP_URL ||
+          "https://www.dentraflow.com";
+        let url = `${base.replace(/\/$/, "")}/api/public/clinic?slug=${encodeURIComponent(slug)}&sig=${encodeURIComponent(sig)}`;
         if (agentId) url += `&agent=${encodeURIComponent(agentId)}`;
         else if (locationId) url += `&location=${encodeURIComponent(locationId)}`;
         const res = await fetch(url);

@@ -81,6 +81,7 @@ const MSG_ENTER_EMAIL = "Thanks! Enter your email.";
 const MSG_ENTER_WHATSAPP = "Enter your WhatsApp number (with country code, e.g. +1234567890).";
 const MSG_NAME_EMAIL_CONTINUE = "Enter your email to continue.";
 const MSG_BOOKING_FAILED = "Booking failed. Please try again.";
+const MSG_BOOKING_FAILED_LAST = "Something went wrong. You can start a new booking or go back.";
 const MSG_CANCELLED = "Your appointment has been cancelled. We hope to see you soon!";
 const MSG_CANNOT_CANCEL = "Could not cancel.";
 const MSG_CALL_CLINIC = "Please call the clinic.";
@@ -119,8 +120,12 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
   const [patientDetailsStep, setPatientDetailsStep] = useState<"name" | "email" | "whatsapp">("name");
   const [patientWhatsApp, setPatientWhatsApp] = useState<string | null>(null);
   const [verifyAttemptCount, setVerifyAttemptCount] = useState(0);
+  const [bookingFailCount, setBookingFailCount] = useState(0);
 
-  const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+  const baseUrl =
+    (typeof window !== "undefined" ? window.location.origin : "") ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    "https://www.dentraflow.com";
 
   const appendMessage = useCallback((role: "user" | "ai", text: string) => {
     setMessages((prev) => [...prev, { id: String(Date.now()), role, text }]);
@@ -216,6 +221,7 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
       switch (currentState) {
         case "GREETING":
           if (key === "book") {
+            setBookingFailCount(0);
             setStateWithMessageAndSuggestions("BOOKING_REASON", MSG_BOOKING_REASON, FIXED_SERVICES);
           } else if (key === "change_cancel") {
             setIsInputDisabled(false);
@@ -296,6 +302,7 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
             setSuggestions(greetingSuggestions);
             appendMessage("ai", GREETING_MSG);
           } else if (key === "book") {
+            setBookingFailCount(0);
             setStateWithMessageAndSuggestions("BOOKING_REASON", MSG_BOOKING_REASON, FIXED_SERVICES);
           }
           break;
@@ -468,13 +475,41 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
             setPatientWhatsApp(null);
             setPatientDetailsStep("name");
           } else {
-            const errMsg = data.error || MSG_BOOKING_FAILED;
-            setMessage(errMsg);
-            appendMessage("ai", errMsg);
+            const nextFail = bookingFailCount + 1;
+            setBookingFailCount(nextFail);
+            if (nextFail >= 3) {
+              setSelectedSlot(null);
+              setPatientName(null);
+              setPatientEmail(null);
+              setPatientWhatsApp(null);
+              setPatientDetailsStep("name");
+              setStateWithMessageAndSuggestions("GREETING", MSG_BOOKING_FAILED_LAST, [
+                { key: "book", label: "Book Appointment", variant: "primary" },
+                backChip,
+              ]);
+            } else {
+              const errMsg = data.error || MSG_BOOKING_FAILED;
+              setMessage(errMsg);
+              appendMessage("ai", errMsg);
+            }
           }
         } catch {
-          setMessage(MSG_BOOKING_FAILED);
-          appendMessage("ai", MSG_BOOKING_FAILED);
+          const nextFail = bookingFailCount + 1;
+          setBookingFailCount(nextFail);
+          if (nextFail >= 3) {
+            setSelectedSlot(null);
+            setPatientName(null);
+            setPatientEmail(null);
+            setPatientWhatsApp(null);
+            setPatientDetailsStep("name");
+            setStateWithMessageAndSuggestions("GREETING", MSG_BOOKING_FAILED_LAST, [
+              { key: "book", label: "Book Appointment", variant: "primary" },
+              backChip,
+            ]);
+          } else {
+            setMessage(MSG_BOOKING_FAILED);
+            appendMessage("ai", MSG_BOOKING_FAILED);
+          }
         }
         return;
       }
@@ -486,6 +521,7 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
       patientEmail,
       selectedSlot,
       verifyAttemptCount,
+      bookingFailCount,
       baseUrl,
       clinicSlug,
       sig,

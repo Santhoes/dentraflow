@@ -61,6 +61,8 @@ export function EmbedChat({ clinicName, locationName, agentName, agentId, clinic
   const [isListening, setIsListening] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [failedAttempts, setFailedAttempts] = useState(0);
+  const [connectTryCount, setConnectTryCount] = useState(0);
+  const TRY_AGAIN_MAX = 3;
   const bottomRef = useRef<HTMLDivElement>(null);
   const greetingSoundPlayed = useRef(false);
   const recognitionRef = useRef<unknown>(null);
@@ -137,8 +139,11 @@ export function EmbedChat({ clinicName, locationName, agentName, agentId, clinic
     }));
 
     try {
-      const base = typeof window !== "undefined" ? window.location.origin : "";
-      const res = await fetch(`${base}/api/embed/chat`, {
+      const base =
+        (typeof window !== "undefined" ? window.location.origin : "") ||
+        process.env.NEXT_PUBLIC_APP_URL ||
+        "https://www.dentraflow.com";
+      const res = await fetch(`${base.replace(/\/$/, "")}/api/embed/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -152,15 +157,23 @@ export function EmbedChat({ clinicName, locationName, agentName, agentId, clinic
       });
       const data = await res.json().catch(() => ({})) as { message?: string; reset_conversation?: boolean; failed_attempts?: number };
       if (res.status === 429) {
-        setMessages((m) => [...m, { id: `ai-${Date.now()}`, role: "ai", text: data.message || "Too many messages. Please wait a minute and try again." }]);
+        const next = connectTryCount + 1;
+        setConnectTryCount(next);
+        const msg =
+          next >= TRY_AGAIN_MAX
+            ? "Too many messages. You can try a new booking, change/cancel, or go back."
+            : data.message || `Too many messages (${next} of ${TRY_AGAIN_MAX}).`;
+        setMessages((m) => [...m, { id: `ai-${Date.now()}`, role: "ai", text: msg }]);
       } else if (data.reset_conversation) {
         setFailedAttempts(0);
+        setConnectTryCount(0);
         const msg = data.message || "Let's start fresh 🙂 What can we help with? Pain • Cleaning • Checkup • Book";
         setMessages([
           { id: "0", role: "ai", text: welcome },
           { id: `ai-${Date.now()}`, role: "ai", text: msg },
         ]);
       } else {
+        setConnectTryCount(0);
         if (typeof data.failed_attempts === "number") setFailedAttempts(data.failed_attempts);
         const reply =
           res.ok && data.message
@@ -171,10 +184,13 @@ export function EmbedChat({ clinicName, locationName, agentName, agentId, clinic
         setMessages((m) => [...m, { id: `ai-${Date.now()}`, role: "ai", text: reply }]);
       }
     } catch {
-      setMessages((m) => [
-        ...m,
-        { id: `ai-${Date.now()}`, role: "ai", text: "Sorry, I couldn't connect. Please try again." },
-      ]);
+      const next = connectTryCount + 1;
+      setConnectTryCount(next);
+      const msg =
+        next >= TRY_AGAIN_MAX
+          ? "I couldn't connect. You can try a new booking, change/cancel, or go back."
+          : `Sorry, I couldn't connect (${next} of ${TRY_AGAIN_MAX}).`;
+      setMessages((m) => [...m, { id: `ai-${Date.now()}`, role: "ai", text: msg }]);
     } finally {
       setIsTyping(false);
     }

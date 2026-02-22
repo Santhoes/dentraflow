@@ -343,31 +343,34 @@ export default function SupportCaseDetailPage() {
             </div>
           ))}
 
-          {/* Continue conversation */}
-          <div className="px-4 py-4 sm:px-6 border-t border-slate-100">
-            <p className="text-xs font-medium text-slate-600 mb-2">Continue conversation</p>
-            <div className="flex gap-2">
-              <textarea
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
-                placeholder="Add a message..."
-                rows={2}
-                className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-              <button
-                type="button"
-                onClick={handleSendReply}
-                disabled={sendingReply || !replyText.trim()}
-                className="self-end inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50"
-              >
-                {sendingReply ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                Send
-              </button>
+          {/* Continue conversation — only when case is open */}
+          {caseData.status === "closed" ? (
+            <div className="px-4 py-4 sm:px-6 border-t border-slate-100">
+              <p className="text-sm text-slate-500">This case is closed. You cannot add more messages.</p>
             </div>
-            {caseData.status === "closed" && (
-              <p className="mt-1.5 text-xs text-slate-500">Sending a message will reopen this case.</p>
-            )}
-          </div>
+          ) : (
+            <div className="px-4 py-4 sm:px-6 border-t border-slate-100">
+              <p className="text-xs font-medium text-slate-600 mb-2">Continue conversation</p>
+              <div className="flex gap-2">
+                <textarea
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  placeholder="Add a message..."
+                  rows={2}
+                  className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+                <button
+                  type="button"
+                  onClick={handleSendReply}
+                  disabled={sendingReply || !replyText.trim()}
+                  className="self-end inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {sendingReply ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  Send
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

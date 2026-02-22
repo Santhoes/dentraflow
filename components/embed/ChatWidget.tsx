@@ -85,9 +85,17 @@ export function ChatWidget(config: ChatWidgetConfig) {
   const [isListening, setIsListening] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [failedAttempts, setFailedAttempts] = useState(0);
+  const [connectTryCount, setConnectTryCount] = useState(0);
   const [chipsVisible, setChipsVisible] = useState(true);
   const [suggestedSlots, setSuggestedSlots] = useState<SuggestionItem[]>([]);
   const [inactivityMessage, setInactivityMessage] = useState<string | null>(null);
+
+  const TRY_AGAIN_MAX = 3;
+  const tryAgainChips: SuggestionItem[] = [
+    { label: "Book Appointment" },
+    { label: "Change / Cancel" },
+    { label: "Back" },
+  ];
 
   const lastActivityRef = useRef(Date.now());
   const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -219,9 +227,12 @@ export function ChatWidget(config: ChatWidgetConfig) {
       const chatHistory = [...messages, userMsg].map((m) => ({ role: m.role, content: m.text }));
 
       try {
-        const base = typeof window !== "undefined" ? window.location.origin : "";
+        const base =
+          (typeof window !== "undefined" ? window.location.origin : "") ||
+          process.env.NEXT_PUBLIC_APP_URL ||
+          "https://www.dentraflow.com";
         const selectedDate = extractSelectedDateFromMessages(messages);
-        const res = await fetch(`${base}/api/embed/chat`, {
+        const res = await fetch(`${base.replace(/\/$/, "")}/api/embed/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -241,12 +252,24 @@ export function ChatWidget(config: ChatWidgetConfig) {
           suggested_slots?: { label: string; value: string }[];
         };
         if (res.status === 429) {
-          setMessages((m) => [
-            ...m,
-            { id: `ai-${Date.now()}`, role: "ai", text: data.message || "Too many messages. Please wait a minute and try again." },
-          ]);
+          const next = connectTryCount + 1;
+          setConnectTryCount(next);
+          if (next >= TRY_AGAIN_MAX) {
+            setMessages((m) => [
+              ...m,
+              { id: `ai-${Date.now()}`, role: "ai", text: "Too many messages. You can try a new booking, change/cancel, or go back." },
+            ]);
+            setChipsVisible(true);
+            setSuggestedSlots(tryAgainChips);
+          } else {
+            setMessages((m) => [
+              ...m,
+              { id: `ai-${Date.now()}`, role: "ai", text: data.message || `Too many messages. Please wait a minute (${next} of ${TRY_AGAIN_MAX}).` },
+            ]);
+          }
         } else if (data.reset_conversation) {
           setFailedAttempts(0);
+          setConnectTryCount(0);
           setSuggestedSlots([]);
           const msg = data.message || "Let's start fresh 🙂 What can we help with? Pain • Cleaning • Checkup • Book";
           setMessages([
@@ -255,6 +278,7 @@ export function ChatWidget(config: ChatWidgetConfig) {
           ]);
           setChipsVisible(true);
         } else {
+          setConnectTryCount(0);
           if (typeof data.failed_attempts === "number") setFailedAttempts(data.failed_attempts);
           if (Array.isArray(data.suggested_slots) && data.suggested_slots.length > 0) {
             setSuggestedSlots(data.suggested_slots);
@@ -270,10 +294,21 @@ export function ChatWidget(config: ChatWidgetConfig) {
           setMessages((m) => [...m, { id: `ai-${Date.now()}`, role: "ai", text: reply }]);
         }
       } catch {
-        setMessages((m) => [
-          ...m,
-          { id: `ai-${Date.now()}`, role: "ai", text: "Sorry, I couldn't connect. Please try again." },
-        ]);
+        const next = connectTryCount + 1;
+        setConnectTryCount(next);
+        if (next >= TRY_AGAIN_MAX) {
+          setMessages((m) => [
+            ...m,
+            { id: `ai-${Date.now()}`, role: "ai", text: "I couldn't connect. You can try a new booking, change/cancel, or go back." },
+          ]);
+          setChipsVisible(true);
+          setSuggestedSlots(tryAgainChips);
+        } else {
+          setMessages((m) => [
+            ...m,
+            { id: `ai-${Date.now()}`, role: "ai", text: `Sorry, I couldn't connect (${next} of ${TRY_AGAIN_MAX}).` },
+          ]);
+        }
       } finally {
         setIsTyping(false);
       }
@@ -283,6 +318,7 @@ export function ChatWidget(config: ChatWidgetConfig) {
       messages,
       chipsVisible,
       failedAttempts,
+      connectTryCount,
       clinicSlug,
       locationId,
       agentId,

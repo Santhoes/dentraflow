@@ -53,6 +53,14 @@ export async function POST(
   if ((caseRow as { clinic_id: string }).clinic_id !== clinicId)
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  const statusCol = (caseRow as { status?: string }).status;
+  if (statusCol === "closed") {
+    return NextResponse.json(
+      { error: "Case is closed. You cannot add messages. Reopen the case from Support to continue." },
+      { status: 400 }
+    );
+  }
+
   const { error: insertErr } = await admin.from("support_replies").insert({
     case_id: caseId,
     from_role: "user",
@@ -60,14 +68,6 @@ export async function POST(
     body: message,
   });
   if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
-
-  const statusCol = (caseRow as { status?: string }).status;
-  if (statusCol === "closed") {
-    await admin
-      .from("support_messages")
-      .update({ status: "open" })
-      .eq("id", caseId);
-  }
 
   return NextResponse.json({ ok: true });
 }
