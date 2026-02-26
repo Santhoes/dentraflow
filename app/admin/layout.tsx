@@ -15,6 +15,7 @@ import {
   LogOut,
   Menu,
   X,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -22,6 +23,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 const NAV = [
   { label: "Dashboard & Analytics", href: "/admin", icon: LayoutDashboard },
   { label: "Clinics & Staff", href: "/admin/clinics", icon: Building2 },
+  { label: "Users", href: "/admin/users", icon: Users },
   { label: "Billing", href: "/admin/billing", icon: CreditCard },
   { label: "Appointments", href: "/admin/appointments", icon: Calendar },
   { label: "Support", href: "/admin/support", icon: MessageSquare },
