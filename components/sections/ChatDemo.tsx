@@ -4,42 +4,70 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
 
-const MESSAGES: { role: "patient" | "ai"; text: string; delay: number }[] = [
-  { role: "patient", text: "Hi, I’d like to book a cleaning.", delay: 0 },
-  { role: "ai", text: "Hi! I’d be happy to help. Which location do you prefer?", delay: 1200 },
-  { role: "patient", text: "Downtown office please.", delay: 2800 },
-  { role: "ai", text: "Got it. We have openings this Thu 2pm or Fri 10am. Which works?", delay: 4000 },
-  { role: "patient", text: "Thursday 2pm works!", delay: 5600 },
-  { role: "ai", text: "You’re all set for Thu at 2pm. We’ll send a reminder. Anything else?", delay: 7000 },
+const GREETING = "Hi 👋 How can I help you today?";
+const DEMO_CLINIC = "Demo Dental";
+
+type AnimatedStep =
+  | { type: "ai"; text: string }
+  | { type: "user"; text: string; isChip?: boolean };
+
+const ANIMATED_SEQUENCE: { step: AnimatedStep; delay: number }[] = [
+  { step: { type: "ai", text: GREETING }, delay: 0 },
+  { step: { type: "user", text: "Book Appointment", isChip: true }, delay: 2200 },
+  { step: { type: "ai", text: "What do you need? Pick a reason." }, delay: 800 },
+  { step: { type: "user", text: "Cleaning", isChip: true }, delay: 1600 },
+  { step: { type: "ai", text: "When would you like to come? Pick a day." }, delay: 800 },
+  { step: { type: "user", text: "Tomorrow", isChip: true }, delay: 1600 },
+  { step: { type: "ai", text: "Morning, afternoon, or evening?" }, delay: 800 },
+  { step: { type: "user", text: "2:00 PM", isChip: true }, delay: 1600 },
+  { step: { type: "ai", text: "Enter your full name." }, delay: 800 },
+  { step: { type: "user", text: "Jane" }, delay: 1400 },
+  { step: { type: "ai", text: "Thanks! Enter your email." }, delay: 800 },
+  { step: { type: "user", text: "jane@example.com" }, delay: 1400 },
+  { step: { type: "ai", text: "Confirm your booking: Tomorrow at 2:00 PM." }, delay: 800 },
+  { step: { type: "user", text: "Confirm booking", isChip: true }, delay: 1200 },
+  { step: { type: "ai", text: "You're booked! Confirmation sent by email." }, delay: 0 },
 ];
 
-export function ChatDemo() {
-  const [visibleCount, setVisibleCount] = useState(0);
+const LOOP_DELAY_MS = 15000;
 
+export function ChatDemo() {
+  const [visibleSteps, setVisibleSteps] = useState(0);
+  const [loopKey, setLoopKey] = useState(0);
   const timeoutIdsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
   useEffect(() => {
     const runSequence = () => {
       timeoutIdsRef.current.forEach(clearTimeout);
       timeoutIdsRef.current = [];
-      setVisibleCount(0);
-      MESSAGES.forEach((_, i) => {
+      setVisibleSteps(0);
+      let t = 0;
+      ANIMATED_SEQUENCE.forEach(({ step, delay }, i) => {
+        t += delay;
         timeoutIdsRef.current.push(
-          setTimeout(() => setVisibleCount((c) => Math.min(c + 1, MESSAGES.length)), MESSAGES[i].delay)
+          setTimeout(() => setVisibleSteps((c) => Math.max(c, i + 1)), t)
         );
       });
     };
+
     runSequence();
-    const loopId = setInterval(runSequence, 12000);
+    const loopId = setInterval(() => {
+      setLoopKey((k) => k + 1);
+      runSequence();
+    }, LOOP_DELAY_MS);
+
     return () => {
       timeoutIdsRef.current.forEach(clearTimeout);
       clearInterval(loopId);
     };
-  }, []);
+  }, [loopKey]);
 
-  const displayCount = visibleCount % (MESSAGES.length + 1);
+  const displaySteps = ANIMATED_SEQUENCE.slice(0, visibleSteps);
+  const showTyping = visibleSteps < ANIMATED_SEQUENCE.length;
 
   return (
     <motion.div
+      key={loopKey}
       className="relative w-full max-w-sm rounded-2xl border border-slate-200/80 bg-white/90 p-1 shadow-soft backdrop-blur-sm"
       style={{ boxShadow: "0 25px 50px -12px rgba(0,0,0,0.08)" }}
       whileHover={{ y: -4 }}
@@ -50,35 +78,38 @@ export function ChatDemo() {
           <Image src="/logo.png" alt="" width={28} height={28} className="h-7 w-7 rounded object-contain" />
           <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-white" aria-hidden />
         </span>
-        <span className="text-xs font-medium text-slate-500">DentraFlow • Live</span>
+        <span className="text-xs font-medium text-slate-500">{DEMO_CLINIC} • Live</span>
       </div>
-      <div className="flex flex-col gap-3 p-4 min-h-[280px]">
-        {MESSAGES.slice(0, displayCount).map((msg, i) => (
+      <div className="flex min-h-[280px] flex-col gap-3 p-4">
+        {displaySteps.map(({ step }, i) => (
           <motion.div
             key={i}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`flex ${msg.role === "ai" ? "justify-start" : "justify-end"}`}
+            transition={{ duration: 0.2 }}
+            className={`flex ${step.type === "ai" ? "justify-start" : "justify-end"}`}
           >
             <div
               className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${
-                msg.role === "ai"
-                  ? "bg-primary/10 text-slate-800 rounded-bl-md"
-                  : "bg-primary text-white rounded-br-md"
+                step.type === "ai"
+                  ? "rounded-bl-md bg-primary/10 text-slate-800"
+                  : step.type === "user" && step.isChip
+                    ? "rounded-br-md border-2 border-primary/40 bg-primary/10 text-primary font-medium"
+                    : "rounded-br-md bg-primary text-white"
               }`}
             >
-              {msg.text}
+              {step.text}
             </div>
           </motion.div>
         ))}
-        {displayCount < MESSAGES.length && (
+        {showTyping && (
           <motion.div
             animate={{ opacity: [0.5, 1] }}
             transition={{ repeat: Infinity, duration: 0.8 }}
             className="flex justify-start"
           >
             <div className="rounded-2xl rounded-bl-md bg-primary/10 px-4 py-2.5 text-sm text-slate-400">
-              <span className="inline-block w-2 h-2 rounded-full bg-current animate-pulse" />
+              <span className="inline-block h-2 w-2 rounded-full bg-current animate-pulse" />
             </div>
           </motion.div>
         )}

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireAdmin } from "@/lib/admin-auth-server";
 import { sendResendEmail } from "@/lib/resend";
 import { renderEmailHtml, escapeHtml } from "@/lib/email-template";
 
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
 
   const { data: ownerRow } = await admin
     .from("clinic_members")
-    .select("user_id")
+    .select("app_user_id")
     .eq("clinic_id", clinicId)
     .eq("role", "owner")
     .limit(1)
@@ -45,15 +45,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Clinic has no owner" }, { status: 400 });
   }
 
-  const userId = (ownerRow as { user_id: string }).user_id;
-  let ownerEmail: string;
-  try {
-    const { data: { user } } = await admin.auth.admin.getUserById(userId);
-    ownerEmail = user?.email ?? "";
-  } catch {
+  const appUserId = (ownerRow as { app_user_id: string | null }).app_user_id;
+  if (!appUserId) {
+    return NextResponse.json({ error: "Clinic owner is not linked to an app user" }, { status: 400 });
+  }
+
+  const { data: appUser, error: appUserError } = await admin
+    .from("app_users")
+    .select("email")
+    .eq("id", appUserId)
+    .maybeSingle();
+
+  if (appUserError) {
+    console.error("admin send-plan-expired app_user lookup", appUserError);
     return NextResponse.json({ error: "Could not resolve owner email" }, { status: 500 });
   }
 
+  const ownerEmail = (appUser as { email?: string | null } | null)?.email ?? "";
   if (!ownerEmail) {
     return NextResponse.json({ error: "Owner has no email" }, { status: 400 });
   }

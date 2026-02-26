@@ -8,3 +8,12 @@ Run the SQL in `migrations/` in your Supabase project (SQL Editor or via Supabas
   - Adds `created_at` to `payments` if not present (for admin earnings over time).
 
 If you already use the full schema (e.g. from `full-schema-and-migrations-new-project.sql`), you already have `clinics`, `clinic_members`, `appointments`, `payments`, etc. Only run the migration above if `payments` is missing the `created_at` column.
+
+## Auth: Leaked password protection (linter)
+
+If the linter reports **Leaked Password Protection Disabled**, enable it in the Dashboard (not in migrations):
+
+1. Open [Auth → Providers → Email](https://supabase.com/dashboard/project/_/auth/providers?provider=Email).
+2. Under **Password security**, turn on **Prevent use of leaked passwords** (HaveIBeenPwned check).
+
+Requires **Pro plan or above**. [Docs](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection).

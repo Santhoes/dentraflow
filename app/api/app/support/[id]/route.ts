@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getAuthContextFromRequest } from "@/lib/auth/app-auth";
 
 /**
  * GET /api/app/support/[id] — get one support case (auth, must be clinic member).
@@ -11,24 +11,18 @@ import { createAdminClient } from "@/lib/supabase/admin";
 async function getAuthAndCase(
   request: Request,
   id: string
-): Promise<{ user: { id: string }; clinicId: string; caseRow: Record<string, unknown> } | NextResponse> {
-  const authHeader = request.headers.get("authorization");
-  const token = authHeader?.replace("Bearer ", "").trim();
-  if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) return NextResponse.json({ error: "Server config" }, { status: 500 });
-
-  const supabase = createClient(url, anonKey);
-  const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-  if (userError || !user) return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+): Promise<
+  | { user: { id: string }; clinicId: string; caseRow: Record<string, unknown>; replies: unknown[] }
+  | NextResponse
+> {
+  const ctx = await getAuthContextFromRequest(request);
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const admin = createAdminClient();
   const { data: member } = await admin
     .from("clinic_members")
     .select("clinic_id")
-    .eq("user_id", user.id)
+    .eq("app_user_id", ctx.user.id)
     .limit(1)
     .maybeSingle();
   if (!member?.clinic_id) return NextResponse.json({ error: "No clinic" }, { status: 403 });
@@ -36,21 +30,38 @@ async function getAuthAndCase(
   const clinicId = (member as { clinic_id: string }).clinic_id;
   const { data: caseRow, error: caseErr } = await admin
     .from("support_messages")
-    .select("id, clinic_id, user_id, subject, body, created_at, admin_reply, admin_replied_at")
+    .select("id, clinic_id, user_id, app_user_id, subject, body, created_at, admin_reply, admin_replied_at, status")
     .eq("id", id)
     .single();
   if (caseErr || !caseRow) return NextResponse.json({ error: "Case not found" }, { status: 404 });
   if ((caseRow as { clinic_id: string }).clinic_id !== clinicId)
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  return { user: { id: user.id }, clinicId, caseRow: caseRow as Record<string, unknown> };
+  const { data: replies } = await admin
+    .from("support_replies")
+    .select("id, case_id, from_role, body, created_at")
+    .eq("case_id", id)
+    .order("created_at", { ascending: true });
+
+  return {
+    user: { id: ctx.user.id },
+    clinicId,
+    caseRow: caseRow as Record<string, unknown>,
+    replies: replies ?? [],
+  };
+}
+
+function isCaseOwner(caseRow: Record<string, unknown>, appUserId: string): boolean {
+  if ((caseRow.app_user_id as string) === appUserId) return true;
+  if ((caseRow.user_id as string) === appUserId) return true;
+  return false;
 }
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const result = await getAuthAndCase(request, id);
   if (result instanceof NextResponse) return result;
-  return NextResponse.json({ case: result.caseRow });
+  return NextResponse.json({ case: result.caseRow, replies: result.replies });
 }
 
 export async function PATCH(
@@ -61,7 +72,7 @@ export async function PATCH(
   const result = await getAuthAndCase(request, id);
   if (result instanceof NextResponse) return result;
   const { user, caseRow } = result;
-  if ((caseRow.user_id as string) !== user.id)
+  if (!isCaseOwner(caseRow, user.id))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   if (caseRow.admin_reply != null)
     return NextResponse.json({ error: "Cannot edit after support has replied" }, { status: 400 });
@@ -97,7 +108,7 @@ export async function DELETE(
   const result = await getAuthAndCase(_request, id);
   if (result instanceof NextResponse) return result;
   const { user, caseRow } = result;
-  if ((caseRow.user_id as string) !== user.id)
+  if (!isCaseOwner(caseRow, user.id))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   if (caseRow.admin_reply != null)
     return NextResponse.json({ error: "Cannot delete after support has replied" }, { status: 400 });

@@ -82,6 +82,7 @@ export default function AppLocationsPage() {
   const [embedLocationLabel, setEmbedLocationLabel] = useState("");
   const [embedData, setEmbedData] = useState<{ embedUrl: string; iframeSnippet: string } | null>(null);
   const [embedLoading, setEmbedLoading] = useState(false);
+  const [embedError, setEmbedError] = useState<string | null>(null);
   const [embedCopied, setEmbedCopied] = useState<"url" | "snippet" | null>(null);
   const [form, setForm] = useState<{
     name: string;
@@ -168,30 +169,36 @@ export default function AppLocationsPage() {
     setEmbedModalOpen(true);
     setEmbedLocationLabel(label);
     setEmbedData(null);
+    setEmbedError(null);
     setEmbedLoading(true);
     setEmbedCopied(null);
-    const supabase = createClient();
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      const token = session?.access_token;
-      if (!token) {
-        setEmbedLoading(false);
-        return;
-      }
-      const url = locationId
-        ? `/api/app/embed-url?location=${encodeURIComponent(locationId)}`
-        : "/api/app/embed-url";
-      fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-        .then((res) => res.json())
-        .then((data) => {
+    const url = locationId
+      ? `/api/app/embed-url?location=${encodeURIComponent(locationId)}`
+      : "/api/app/embed-url";
+    fetch(url, { credentials: "include" })
+      .then(async (res) => {
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            setEmbedError(data.error || "Could not load embed. Try again.");
+            return;
+          }
           if (data.embedUrl && data.iframeSnippet) {
             setEmbedData({ embedUrl: data.embedUrl, iframeSnippet: data.iframeSnippet });
+            setEmbedError(null);
+          } else {
+            setEmbedError(data.error || "Invalid response. Try again.");
           }
         })
-        .finally(() => setEmbedLoading(false));
-    });
+      .catch(() => setEmbedError("Network error. Check your connection and try again."))
+      .finally(() => setEmbedLoading(false));
   }, []);
 
   const canAccess = clinic ? hasPlanFeature(clinic.plan, "multiLocation") : false;
+
+  const bookingPageUrl =
+    clinic?.plan === "smart_booking" && clinic?.slug
+      ? `${(process.env.NEXT_PUBLIC_APP_URL || "https://dentraflow.com").replace(/\/$/, "")}/${clinic.slug}`
+      : null;
 
   const addHoliday = async () => {
     if (!clinic?.id || !holidayForm.date.trim()) return;
@@ -283,7 +290,7 @@ export default function AppLocationsPage() {
     if (!form.name.trim()) return;
     const whatsappTrim = form.phone.trim();
     if (!whatsappTrim) {
-      setLocationFormError("WhatsApp number is required for this location.");
+      setLocationFormError("Phone number is required for this location.");
       return;
     }
     setLocationFormError(null);
@@ -389,15 +396,12 @@ export default function AppLocationsPage() {
 
   const savePrimary = async () => {
     if (!primaryForm.whatsapp_phone?.trim()) return;
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
-    if (!token) return;
     setPrimarySaving(true);
     try {
       const res = await fetch("/api/app/clinic", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: primaryForm.name.trim(),
           country: primaryForm.country.trim() || undefined,
@@ -475,7 +479,8 @@ export default function AppLocationsPage() {
       TIMEZONES={TIMEZONES}
       DAYS={DAYS}
       DAY_LABELS={DAY_LABELS}
-      onGetEmbed={canAccess ? openEmbed : undefined}
+      onGetEmbed={openEmbed}
+      bookingPageUrl={bookingPageUrl}
     />
 
     {embedModalOpen && (
@@ -549,6 +554,8 @@ export default function AppLocationsPage() {
                   </button>
                 </div>
               </>
+            ) : embedError ? (
+              <p className="text-sm text-red-600">{embedError}</p>
             ) : (
               <p className="text-sm text-slate-500">Unable to load embed. Try again later.</p>
             )}

@@ -1,3 +1,12 @@
+/* Embed iframe: no white background when chat is closed/minimized */
+html,
+body,
+body.embed-iframe-transparent,
+#__next {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
 .embed-panel-scrollbar {
   scroll-behavior: smooth;
 }

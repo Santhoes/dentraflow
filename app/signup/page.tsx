@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/lib/supabase/client";
 import {
   SIGNUP_STORAGE_KEY,
   PLANS,
@@ -14,6 +13,7 @@ import {
   type PlanId,
 } from "@/lib/supabase/types";
 import { computePriceWithTax } from "@/lib/tax-by-country";
+import { validatePassword } from "@/lib/password-validate";
 import { Check, Loader2 } from "lucide-react";
 
 const TIMEZONES = [
@@ -63,7 +63,7 @@ function SignupContent() {
   const [whatsappPhone, setWhatsappPhone] = useState("");
   const [selectedPlan, setSelectedPlan] = useState<PlanId | null>(null);
 
-  const supabase = createClient();
+  const [creating, setCreating] = useState(false);
 
   const persistAndNext = useCallback((nextStep: number) => {
     const prev = loadTemp() || {};
@@ -127,33 +127,29 @@ function SignupContent() {
       }
       setLoading(true);
       setError(null);
-      supabase.auth.signUp({ email: temp.email, password: temp.password })
-        .then(({ data: { user }, error: signUpErr }) => {
-          if (signUpErr) {
-            if (signUpErr.message?.toLowerCase().includes("already registered")) {
-              setError("Email is already taken. Please log in.");
-            } else {
-              setError(signUpErr.message);
-            }
+      fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: temp.email, password: temp.password }),
+      })
+        .then(async (res) => {
+          const json = await res.json().catch(() => ({}));
+          if (!res.ok || json?.error) {
+            setError(json?.error || "Could not create account.");
             setLoading(false);
-            return;
+            return null;
           }
-          if (!user) {
-            setError("Could not create account.");
-            setLoading(false);
-            return;
-          }
-          return supabase.auth.getSession();
+          return json;
         })
-        .then((sessionRes) => {
-          if (!sessionRes?.data?.session?.access_token) return;
+        .then((userRes) => {
+          if (!userRes) return null;
           const temp2 = loadTemp();
-          if (!temp2?.clinicName || !temp2?.country || !temp2?.plan) return;
+          if (!temp2?.clinicName || !temp2?.country || !temp2?.plan) return null;
           const planPrice = PLANS.find((p) => p.id === temp2.plan)?.priceCents ?? 0;
           const { totalCents, taxCents } = computePriceWithTax(planPrice, temp2.country ?? "");
           return fetch("/api/payments/capture", {
             method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${sessionRes.data.session.access_token}` },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               orderId,
               plan: temp2.plan,
@@ -181,7 +177,7 @@ function SignupContent() {
         .catch(() => setError("Something went wrong. Please try again."))
         .finally(() => setLoading(false));
     }
-  }, [success, orderId, cancelled, supabase.auth]);
+  }, [success, orderId, cancelled]);
 
   const handleStep1 = async () => {
     setError(null);
@@ -189,8 +185,9 @@ function SignupContent() {
       setError("Please enter your email.");
       return;
     }
-    if (!password || password.length < 6) {
-      setError("Password must be at least 6 characters.");
+    const passwordErr = validatePassword(password ?? "");
+    if (passwordErr) {
+      setError(passwordErr);
       return;
     }
     setLoading(true);
@@ -224,7 +221,7 @@ function SignupContent() {
     if (!planInfo) return;
     const { totalCents, taxCents } = computePriceWithTax(planInfo.priceCents, country);
 
-    setLoading(true);
+    setCreating(true);
     setError(null);
     try {
       const res = await fetch("/api/payments/create-order", {
@@ -235,7 +232,7 @@ function SignupContent() {
       const data = await res.json();
       if (data.error || !data.approvalUrl) {
         setError(data.error || "Could not start payment");
-        setLoading(false);
+        setCreating(false);
         return;
       }
       saveTemp({ plan: selectedPlan, clinicName, country, timezone, whatsapp_phone: whatsappPhone, email, password });
@@ -243,11 +240,11 @@ function SignupContent() {
         window.location.href = data.approvalUrl;
       } else {
         setError("Payment link not available. Please try again.");
-        setLoading(false);
+        setCreating(false);
       }
     } catch {
       setError("Something went wrong.");
-      setLoading(false);
+      setCreating(false);
     }
   };
 
@@ -320,7 +317,7 @@ function SignupContent() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="mt-1.5 block w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-slate-900 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary"
-                    placeholder="At least 6 characters"
+                    placeholder="At least 8 characters"
                   />
                 </div>
                 {error && <p className="text-sm text-red-600">{error}</p>}
@@ -365,7 +362,7 @@ function SignupContent() {
                   </select>
                 </div>
                 <div>
-                  <label htmlFor="whatsappPhone" className="block text-sm font-medium text-slate-700">WhatsApp number *</label>
+                  <label htmlFor="whatsappPhone" className="block text-sm font-medium text-slate-700">Phone number *</label>
                   <p className="mt-0.5 text-xs text-slate-500">Required for reminders and booking notifications. Include country code (e.g. +1 234 567 8900).</p>
                   <input
                     id="whatsappPhone"
@@ -392,7 +389,7 @@ function SignupContent() {
                         return;
                       }
                       if (!whatsappPhone.trim()) {
-                        setError("WhatsApp number is required.");
+                        setError("Phone number is required.");
                         return;
                       }
                       setError(null);
@@ -511,9 +508,9 @@ function SignupContent() {
                     type="button"
                     className="min-h-[44px] flex-1 touch-manipulation"
                     onClick={handlePlanAndPay}
-                    disabled={loading}
+                    disabled={creating}
                   >
-                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Pay with PayPal"}
+                    {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : "Pay with PayPal"}
                   </Button>
                 </div>
               </motion.div>

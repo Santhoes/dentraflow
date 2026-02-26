@@ -6,8 +6,9 @@ import { renderEmailHtml, escapeHtml } from "@/lib/email-template";
 /**
  * GET or POST /api/cron/renewal-reminders
  * Secured with CRON_SECRET (header: Authorization: Bearer <CRON_SECRET> or x-cron-secret: <CRON_SECRET>).
- * Finds clinics with plan_expires_at in the past (expired) or within next 7 days (upcoming).
- * Sends "plan expired" email to expired, "renewal reminder" to upcoming.
+ * Finds clinics with plan_expires_at within the next 7 days (upcoming).
+ * Sends a single type of email: "plan renewal reminder" for upcoming renewals.
+ * Does NOT send recurring "plan expired" emails; those can be sent manually from the admin panel if needed.
  */
 export async function GET(request: Request) {
   return run(request);
@@ -44,62 +45,56 @@ async function run(request: Request) {
     return NextResponse.json({ error: "Failed to fetch clinics" }, { status: 500 });
   }
 
-  const expired: { id: string; name: string; plan: string; plan_expires_at: string }[] = [];
   const upcoming: { id: string; name: string; plan: string; plan_expires_at: string }[] = [];
 
   for (const c of clinics || []) {
     const exp = (c as { plan_expires_at: string | null }).plan_expires_at;
     if (!exp) continue;
     const expDate = new Date(exp);
-    if (expDate < now) expired.push(c as typeof expired[0]);
-    else if (expDate <= in7Days) upcoming.push(c as typeof upcoming[0]);
+    if (expDate > now && expDate <= in7Days) {
+      upcoming.push(c as (typeof upcoming)[0]);
+    }
   }
 
   const ownerByClinic: Record<string, string> = {};
-  const clinicIds = [...new Set([...expired.map((c) => c.id), ...upcoming.map((c) => c.id)])];
+  const clinicIds = [...new Set(upcoming.map((c) => c.id))];
   if (clinicIds.length > 0) {
     const { data: members } = await admin
       .from("clinic_members")
-      .select("clinic_id, user_id")
+      .select("clinic_id, app_user_id")
       .eq("role", "owner")
       .in("clinic_id", clinicIds);
     for (const m of members || []) {
-      const row = m as { clinic_id: string; user_id: string };
-      ownerByClinic[row.clinic_id] = row.user_id;
+      const row = m as { clinic_id: string; app_user_id: string | null };
+      if (row.app_user_id) {
+        ownerByClinic[row.clinic_id] = row.app_user_id;
+      }
     }
   }
 
   const emailByUserId: Record<string, string> = {};
-  const userIds = [...new Set(Object.values(ownerByClinic))];
-  for (const uid of userIds) {
-    try {
-      const { data: { user } } = await admin.auth.admin.getUserById(uid);
-      if (user?.email) emailByUserId[uid] = user.email;
-    } catch {
-      // skip
+  const appUserIds = [...new Set(Object.values(ownerByClinic))];
+  if (appUserIds.length > 0) {
+    const { data: appUsers, error: appUsersError } = await admin
+      .from("app_users")
+      .select("id, email")
+      .in("id", appUserIds);
+
+    if (appUsersError) {
+      console.error("cron renewal-reminders app_users lookup", appUsersError);
+    } else {
+      for (const u of appUsers || []) {
+        const row = u as { id: string; email: string | null };
+        if (row.email) {
+          emailByUserId[row.id] = row.email;
+        }
+      }
     }
   }
 
-  let sentExpired = 0;
   let sentUpcoming = 0;
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://dentraflow.com").replace(/\/$/, "");
   const planUrl = `${appUrl}/app/plan`;
-
-  for (const c of expired) {
-    const ownerId = ownerByClinic[c.id];
-    const to = ownerId ? emailByUserId[ownerId] : null;
-    if (!to) continue;
-    const result = await sendResendEmail({
-      to,
-      subject: `DentraFlow — Your ${c.name} plan has expired`,
-      html: renderEmailHtml({
-        body: `<p>Your DentraFlow plan for <strong>${escapeHtml(c.name)}</strong> (${escapeHtml(c.plan)}) has expired.</p><p>Renew to keep your AI receptionist and chat widget active.</p>`,
-        button: { text: "Renew plan", url: planUrl },
-        link: { text: "Visit app", url: `${appUrl}/app` },
-      }),
-    });
-    if (result.ok) sentExpired++;
-  }
 
   for (const c of upcoming) {
     const ownerId = ownerByClinic[c.id];
@@ -122,7 +117,6 @@ async function run(request: Request) {
 
   return NextResponse.json({
     ok: true,
-    expired: { total: expired.length, emailsSent: sentExpired },
     upcoming: { total: upcoming.length, emailsSent: sentUpcoming },
   });
 }

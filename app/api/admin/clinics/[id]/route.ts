@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireAdmin } from "@/lib/admin-auth-server";
 
 export async function PATCH(
   request: Request,
@@ -14,6 +14,7 @@ export async function PATCH(
 
   let body: {
     name?: string;
+    slug?: string;
     country?: string;
     timezone?: string;
     plan?: string;
@@ -29,9 +30,16 @@ export async function PATCH(
 
   const updates: Record<string, unknown> = {};
   if (body.name !== undefined) updates.name = body.name.trim();
+  if (body.slug !== undefined) {
+    const slug = body.slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/^-|-$/g, "") || null;
+    if (slug && slug !== "demo") updates.slug = slug;
+  }
   if (body.country !== undefined) updates.country = body.country.trim();
   if (body.timezone !== undefined) updates.timezone = body.timezone?.trim() || "America/New_York";
-  if (body.plan !== undefined) updates.plan = ["starter", "pro", "elite"].includes(body.plan) ? body.plan : "starter";
+  if (body.plan !== undefined) {
+    const allowedPlans = ["starter", "pro", "elite", "smart_booking"];
+    updates.plan = allowedPlans.includes(body.plan) ? body.plan : "starter";
+  }
   if (body.plan_expires_at !== undefined) updates.plan_expires_at = body.plan_expires_at || null;
   if (body.phone !== undefined) updates.phone = body.phone?.trim() || null;
   if (body.working_hours !== undefined) updates.working_hours = body.working_hours;

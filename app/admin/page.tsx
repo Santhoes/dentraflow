@@ -229,7 +229,7 @@ export default function AdminDashboardPage() {
           <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-slate-100">
             ${Number(earningsTotal).toFixed(2)}
           </p>
-          <div className="mt-4 h-64">
+          <div className="mt-4 h-64 min-h-[200px]">
             {loading ? (
               <div className="flex h-full items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-slate-300 dark:text-slate-500" />
@@ -239,7 +239,7 @@ export default function AdminDashboardPage() {
                 No data — show 0
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minHeight={200}>
                 <LineChart data={earningsData}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-600" />
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} className="text-slate-600 dark:text-slate-400" />
@@ -258,7 +258,7 @@ export default function AdminDashboardPage() {
             <span className="font-medium">Patients booked (range)</span>
           </div>
           <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-slate-100">{patientsTotal}</p>
-          <div className="mt-4 h-64">
+          <div className="mt-4 h-64 min-h-[200px]">
             {loading ? (
               <div className="flex h-full items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-slate-300 dark:text-slate-500" />
@@ -268,7 +268,7 @@ export default function AdminDashboardPage() {
                 No data — show 0
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minHeight={200}>
                 <BarChart data={patientsData}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-600" />
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} className="text-slate-600 dark:text-slate-400" />

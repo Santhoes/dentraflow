@@ -3,6 +3,14 @@
 import { useState, useEffect } from "react";
 import { DentalChat } from "@/components/embed/DentalChat";
 
+/** Allow only http(s) URLs for img src to prevent XSS via clinic logo_url. */
+function sanitizeLogoUrl(url: string | null | undefined): string | undefined {
+  if (!url || typeof url !== "string") return undefined;
+  const t = url.trim();
+  if (!/^https?:\/\/[^\s<>"']+$/i.test(t)) return undefined;
+  return t;
+}
+
 export interface EmbedChatClientProps {
   slug: string | null;
   sig: string | null;
@@ -27,6 +35,10 @@ export function EmbedChatClient({ slug, sig, locationId, agentId }: EmbedChatCli
     working_hours?: Record<string, { open: string; close: string }> | null;
     address?: string | null;
     timezone?: string;
+    services?: { id: string; name: string; duration_minutes: number; sort_order: number }[] | null;
+    cancellation_policy_text?: string | null;
+    deposit_required?: boolean;
+    require_policy_agreement?: boolean;
   } | null>(null);
   const [loading, setLoading] = useState(!!(slug && sig));
   const [error, setError] = useState<string | null>(null);
@@ -81,6 +93,10 @@ export function EmbedChatClient({ slug, sig, locationId, agentId }: EmbedChatCli
           working_hours: data.working_hours ?? null,
           address: data.address ?? null,
           timezone: data.timezone ?? "America/New_York",
+          services: data.services ?? null,
+          cancellation_policy_text: data.cancellation_policy_text ?? null,
+          deposit_required: data.deposit_required === true,
+          require_policy_agreement: data.require_policy_agreement !== false,
         });
       } catch {
         if (!cancelled) {
@@ -129,7 +145,11 @@ export function EmbedChatClient({ slug, sig, locationId, agentId }: EmbedChatCli
           ? "min-h-[100dvh] w-full bg-slate-50 dark:bg-slate-900 sm:min-h-[400px]"
           : "min-h-0 w-full bg-transparent"
       }
-      style={isWidgetOpen ? { minHeight: "320px" } : undefined}
+      style={
+        isWidgetOpen
+          ? { minHeight: "320px" }
+          : { background: "transparent", minHeight: 0 }
+      }
     >
       <DentalChat
         clinicName={clinic!.name}
@@ -139,7 +159,7 @@ export function EmbedChatClient({ slug, sig, locationId, agentId }: EmbedChatCli
         clinicSlug={slug!}
         locationId={locationId ?? undefined}
         sig={sig!}
-        logoUrl={clinic!.logo_url ?? undefined}
+        logoUrl={sanitizeLogoUrl(clinic!.logo_url ?? undefined)}
         primaryColor={clinic!.widget_primary_color ?? undefined}
         isElitePlan={clinic!.plan === "elite"}
         plan={clinic!.plan ?? null}
@@ -151,7 +171,19 @@ export function EmbedChatClient({ slug, sig, locationId, agentId }: EmbedChatCli
           working_hours: clinic!.working_hours ?? undefined,
           address: clinic!.address ?? undefined,
           timezone: clinic!.timezone ?? "America/New_York",
+          cancellation_policy_text: clinic!.cancellation_policy_text ?? undefined,
         }}
+        depositRequired={clinic!.deposit_required === true}
+        requirePolicyAgreement={clinic!.deposit_required === true && clinic!.require_policy_agreement !== false}
+        serviceSuggestions={
+          clinic!.services?.length
+            ? clinic!.services.map((s) => ({
+                key: s.id,
+                label: s.name,
+                duration_minutes: s.duration_minutes,
+              }))
+            : undefined
+        }
       />
     </div>
   );

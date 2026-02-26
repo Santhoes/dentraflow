@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/lib/supabase/client";
 import { Loader2 } from "lucide-react";
 
 function LoginContent() {
@@ -24,28 +23,38 @@ function LoginContent() {
       return;
     }
     setLoading(true);
-    const supabase = createClient();
     const normalizedEmail = email.trim().toLowerCase();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: normalizedEmail,
-      password,
-    });
-    setLoading(false);
-    if (signInError) {
-      const isAdminEmail = normalizedEmail === "admin@dentraflow.com";
-      const message = isAdminEmail
-        ? "Admin sign-in failed. Ensure the user admin@dentraflow.com exists in your Supabase project (Auth → Users). Create it or reset the password there, then try again."
-        : signInError.message;
-      setError(message);
-      return;
-    }
-    if (normalizedEmail === "admin@dentraflow.com") {
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: normalizedEmail, password }),
+      });
+      const data = await res.json();
+      setLoading(false);
+      if (!res.ok || data?.error) {
+        setError(data?.error || "Invalid email or password.");
+        return;
+      }
       await new Promise((r) => setTimeout(r, 150));
-      window.location.href = "/admin";
-      return;
+      if (normalizedEmail === "admin@dentraflow.com") {
+        window.location.href = "/admin";
+      } else {
+        window.location.href = "/app";
+      }
+    } catch (err) {
+      setLoading(false);
+      const isNetwork =
+        err instanceof TypeError && (err.message === "Failed to fetch" || (err as Error).message.includes("fetch"));
+      const isTimeout = err instanceof Error && (err.message.includes("timeout") || err.message.includes("timed out"));
+      if (isNetwork || isTimeout) {
+        setError(
+          "Cannot reach the server. Check your internet connection. If you use a free Supabase project, it may be paused—restore it in the Supabase Dashboard, then try again."
+        );
+        return;
+      }
+      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     }
-    await new Promise((r) => setTimeout(r, 150));
-    window.location.href = "/app";
   };
 
   return (

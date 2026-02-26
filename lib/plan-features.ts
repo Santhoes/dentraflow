@@ -1,11 +1,12 @@
 import type { PlanId } from "@/lib/supabase/types";
 import { PLAN_LIMITS } from "@/lib/supabase/types";
 
-/** Plan order for comparison: starter < pro < elite */
+/** Plan order for comparison: starter < pro < elite < smart_booking */
 const PLAN_ORDER: Record<PlanId, number> = {
   starter: 0,
   pro: 1,
   elite: 2,
+  smart_booking: 3,
 };
 
 /** Features that require at least this plan to be visible/available */
@@ -22,7 +23,6 @@ export const PLAN_FEATURE_MAP: Record<string, PlanId> = {
   modifyCancelViaAI: "pro",
   prioritySupport: "pro",
   unlimitedLocations: "elite",
-  whatsApp: "elite",
   advancedInsights: "elite",
   noShowRecovery: "elite",
   customBranding: "elite",
@@ -32,7 +32,7 @@ export const PLAN_FEATURE_MAP: Record<string, PlanId> = {
 
 /** Normalize plan string from DB (e.g. legacy "enterprise" -> "elite") */
 export function normalizePlan(plan: string | null | undefined): PlanId {
-  if (plan === "pro" || plan === "elite") return plan;
+  if (plan === "pro" || plan === "elite" || plan === "smart_booking") return plan;
   if (plan === "enterprise") return "elite";
   return "starter";
 }

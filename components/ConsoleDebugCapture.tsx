@@ -6,6 +6,7 @@ const INGEST = "http://127.0.0.1:7785/ingest/8b7a328f-cfbf-41bb-bc5d-dd8a87f78da
 const SESSION = "f6ea83";
 
 function send(payload: Record<string, unknown>) {
+  if (typeof window === "undefined" || window.location?.hostname !== "localhost") return;
   fetch(INGEST, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Debug-Session-Id": SESSION },

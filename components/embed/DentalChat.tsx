@@ -2,12 +2,11 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChatLauncher } from "./ChatLauncher";
 import { ChatHeader } from "./ChatHeader";
 import { ChatMessages } from "./ChatMessages";
 import { ChatInput } from "./ChatInput";
 import { SuggestionChips } from "./SuggestionChips";
-import { useDentalAgent, type ClinicInfo } from "./useDentalAgent";
+import { useDentalAgent, type ClinicInfo, type ServiceSuggestion } from "./useDentalAgent";
 import type { ChatMessage } from "./ChatMessages";
 
 const DEFAULT_ACCENT = "#1D4ED8";
@@ -30,6 +29,12 @@ export interface DentalChatConfig {
   clinicInfo: ClinicInfo;
   /** Notify parent when chat open state changes (e.g. to avoid full-height wrapper when minimized). */
   onOpenChange?: (open: boolean) => void;
+  /** Whether clinic requires deposit (Elite); used for policy step. */
+  depositRequired?: boolean;
+  /** When true, show policy agreement before confirm (only relevant when deposit required). When false, skip agreement. */
+  requirePolicyAgreement?: boolean;
+  /** Appointment types (name + duration) for booking chips and slot length. */
+  serviceSuggestions?: ServiceSuggestion[] | null;
 }
 
 export function DentalChat(config: DentalChatConfig) {
@@ -46,6 +51,9 @@ export function DentalChat(config: DentalChatConfig) {
     plan,
     clinicInfo,
     onOpenChange,
+    serviceSuggestions,
+    depositRequired,
+    requirePolicyAgreement = false,
   } = config;
 
   const displayName = locationName ? `${clinicName} — ${locationName}` : clinicName;
@@ -65,15 +73,22 @@ export function DentalChat(config: DentalChatConfig) {
     isElitePlan: !!isElitePlan,
     isProOrElite: plan === "pro" || plan === "elite",
     clinicInfo,
+    serviceSuggestions: serviceSuggestions ?? undefined,
+    requirePolicyAgreement: requirePolicyAgreement === true,
   });
 
   const {
     messages,
     suggestions,
     isInputDisabled,
+    inputPlaceholder,
     isLoadingSlots,
     onChipSelect,
     onSend,
+    showPolicyAgreement,
+    policyAgreed,
+    setPolicyAgreed,
+    cancellationPolicyText,
   } = agent;
 
   // Sync messages type: useDentalAgent returns ChatMessage from hook; ChatMessages expects { id, role, text }
@@ -85,8 +100,8 @@ export function DentalChat(config: DentalChatConfig) {
     const storedDark = localStorage.getItem(STORAGE_DARK);
     if (storedDark !== null) setDark(storedDark === "1");
     else if (window.matchMedia("(prefers-color-scheme: dark)").matches) setDark(true);
-    const storedOpen = localStorage.getItem(STORAGE_OPEN);
-    if (storedOpen === "1") setIsOpen(true);
+    // Open chat and show greeting on every page load/refresh
+    setIsOpen(true);
   }, []);
 
   useEffect(() => {
@@ -149,28 +164,7 @@ export function DentalChat(config: DentalChatConfig) {
   return (
     <>
       <AnimatePresence>
-        {!isOpen && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            className="fixed z-[99999]"
-            style={{ bottom: "max(1.5rem, env(safe-area-inset-bottom))", right: "max(1.5rem, env(safe-area-inset-right))" }}
-          >
-            <ChatLauncher
-              onClick={() => {
-                setIsOpen(true);
-                onOpenChange?.(true);
-              }}
-              accentColor={accentColor}
-              isElite={isElite}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
+        <motion.div
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 24 }}
@@ -200,6 +194,7 @@ export function DentalChat(config: DentalChatConfig) {
               }}
               onMinimize={minimize}
               headerColor={accentColor}
+              hideMinimize
             />
             <div className="flex min-h-0 flex-1 flex-col">
               <ChatMessages
@@ -208,6 +203,37 @@ export function DentalChat(config: DentalChatConfig) {
                 accentColor={accentColor}
                 dark={dark}
               />
+              {showPolicyAgreement && (
+                <div
+                  className={`border-t px-4 py-3 ${
+                    dark ? "border-slate-700 bg-slate-800/50" : "border-slate-200 bg-slate-50/80"
+                  }`}
+                >
+                  {cancellationPolicyText && (
+                    <div
+                      className={`mb-3 max-h-24 overflow-y-auto rounded text-xs ${
+                        dark ? "bg-slate-900/80 text-slate-300" : "bg-white text-slate-600"
+                      } p-2`}
+                    >
+                      {cancellationPolicyText}
+                    </div>
+                  )}
+                  <label
+                    className={`flex cursor-pointer items-start gap-2 text-sm ${
+                      dark ? "text-slate-200" : "text-slate-700"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={policyAgreed}
+                      onChange={(e) => setPolicyAgreed(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
+                      aria-label="I agree to the clinic's cancellation and refund policy"
+                    />
+                    <span>I agree to the clinic&apos;s cancellation and refund policy.</span>
+                  </label>
+                </div>
+              )}
               {isLoadingSlots && (
                 <div className="flex flex-wrap gap-2 px-4 pb-3">
                   {[1, 2, 3, 4].map((i) => (
@@ -234,7 +260,7 @@ export function DentalChat(config: DentalChatConfig) {
                 onChange={setInputValue}
                 onSend={handleSend}
                 disabled={isInputDisabled}
-                placeholder={isInputDisabled ? "Choose an option above" : "Type here..."}
+                placeholder={inputPlaceholder ?? (isInputDisabled ? "Choose an option above" : "Type here...")}
                 voiceSupported={false}
                 isListening={false}
                 onVoiceClick={() => {}}
@@ -243,7 +269,6 @@ export function DentalChat(config: DentalChatConfig) {
               />
             </div>
           </motion.div>
-        )}
       </AnimatePresence>
     </>
   );

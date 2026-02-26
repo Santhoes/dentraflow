@@ -22,18 +22,24 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  const email = typeof body?.email === "string" ? body.email.trim() : "";
+  const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
   if (!email) {
     return NextResponse.json({ error: "Email required" }, { status: 400 });
   }
   try {
-    const supabase = createAdminClient();
-    const { data, error } = await supabase.auth.admin.listUsers({ perPage: 1000 });
-    if (error) {
-      console.error("check-email listUsers error:", error);
-      return NextResponse.json({ error: "Could not check email" }, { status: 500 });
+    const admin = createAdminClient();
+    // Case-insensitive lookup (same as login/signup/forgot-password).
+    const { data: rows, error: rpcError } = await admin.rpc("get_app_user_by_email", { em: email });
+    let data: { id: string } | null = Array.isArray(rows) && rows.length > 0 ? (rows[0] as { id: string }) : null;
+    if (!data && rpcError) {
+      const { data: fallback, error: fallbackError } = await admin.from("app_users").select("id").eq("email", email).maybeSingle();
+      if (fallbackError) {
+        console.error("check-email app_users error:", fallbackError);
+        return NextResponse.json({ error: "Could not check email" }, { status: 500 });
+      }
+      data = fallback;
     }
-    const exists = data.users.some((u) => u.email?.toLowerCase() === email.toLowerCase());
+    const exists = !!data;
     return NextResponse.json({ exists });
   } catch (e) {
     console.error("check-email", e);

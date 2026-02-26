@@ -30,7 +30,7 @@ export async function GET(request: Request) {
     const supabase = createAdminClient();
     const { data: clinic, error: clinicErr } = await supabase
       .from("clinics")
-      .select("id, name, slug, plan, accepts_insurance, insurance_notes, plan_expires_at, logo_url, widget_primary_color, widget_background_color, phone, whatsapp_phone, working_hours, address_line1, address_line2, timezone")
+      .select("id, name, slug, plan, accepts_insurance, insurance_notes, plan_expires_at, logo_url, widget_primary_color, widget_background_color, phone, whatsapp_phone, working_hours, address_line1, address_line2, timezone, cancellation_policy_text, deposit_required, require_policy_agreement")
       .eq("slug", slug)
       .limit(1)
       .maybeSingle();
@@ -87,7 +87,10 @@ export async function GET(request: Request) {
       }
     }
 
-    const plan = clinic.plan === "pro" || clinic.plan === "elite" ? clinic.plan : "starter";
+    const plan =
+      clinic.plan === "pro" || clinic.plan === "elite" || clinic.plan === "smart_booking"
+        ? clinic.plan
+        : "starter";
     const customLogo = (clinic.logo_url ?? "").trim();
     let baseUrl = process.env.NEXT_PUBLIC_APP_URL;
     if (!baseUrl && typeof request.url === "string") {
@@ -100,10 +103,27 @@ export async function GET(request: Request) {
     baseUrl = baseUrl || "https://dentraflow.com";
     const defaultLogoUrl = `${baseUrl}/logo.png`;
     const logo_url =
-      plan === "elite" && customLogo ? customLogo : defaultLogoUrl;
+      (clinic.plan === "elite" || clinic.plan === "smart_booking") && customLogo
+        ? customLogo
+        : defaultLogoUrl;
 
     const address = [address_line1, address_line2].filter(Boolean).join(", ") || null;
     const timezone = (clinic as { timezone?: string | null }).timezone?.trim() || "America/New_York";
+
+    const { data: servicesRows } = await supabase
+      .from("clinic_services")
+      .select("id, name, duration_minutes, sort_order")
+      .eq("clinic_id", clinic.id)
+      .eq("enabled", true)
+      .order("sort_order", { ascending: true });
+
+    const services = (servicesRows || []).map((r: { id: string; name: string; duration_minutes: number; sort_order: number }) => ({
+      id: r.id,
+      name: r.name,
+      duration_minutes: r.duration_minutes,
+      sort_order: r.sort_order,
+    }));
+
     return NextResponse.json({
       id: clinic.id,
       name,
@@ -123,6 +143,10 @@ export async function GET(request: Request) {
       working_hours: working_hours ?? null,
       address: address ?? null,
       timezone,
+      services: services.length > 0 ? services : null,
+      cancellation_policy_text: (clinic as { cancellation_policy_text?: string | null }).cancellation_policy_text ?? null,
+      deposit_required: (clinic as { deposit_required?: boolean }).deposit_required === true,
+      require_policy_agreement: (clinic as { require_policy_agreement?: boolean }).require_policy_agreement !== false,
     });
   } catch (e) {
     return NextResponse.json({ error: "Server error" }, { status: 500 });

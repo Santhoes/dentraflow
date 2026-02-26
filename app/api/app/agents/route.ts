@@ -1,32 +1,21 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getAuthContextFromRequest } from "@/lib/auth/app-auth";
 
 /** One booking assistant per clinic for embed/chat; no plan-based limit. */
 const BOOKING_ASSISTANT_LIMIT = 1;
 
-/**
- * GET /api/app/agents — list booking assistant(s) for the clinic. Used by embed.
- * POST /api/app/agents — create a booking assistant (name required). Max one per clinic.
- */
-async function getClinicIdAndPlan(token: string): Promise<{ clinicId: string; plan: string } | null> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) return null;
-
-  const supabase = createClient(url, anonKey);
-  const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-  if (userError || !user) return null;
-
+async function getClinicIdAndPlan(request: Request): Promise<{ clinicId: string; plan: string } | null> {
+  const ctx = await getAuthContextFromRequest(request);
+  if (!ctx) return null;
   const admin = createAdminClient();
   const { data: member } = await admin
     .from("clinic_members")
     .select("clinic_id")
-    .eq("user_id", user.id)
+    .eq("app_user_id", ctx.user.id)
     .limit(1)
     .maybeSingle();
   if (!member?.clinic_id) return null;
-
   const clinicId = (member as { clinic_id: string }).clinic_id;
   const { data: clinic } = await admin
     .from("clinics")
@@ -37,13 +26,13 @@ async function getClinicIdAndPlan(token: string): Promise<{ clinicId: string; pl
   return { clinicId, plan };
 }
 
+/**
+ * GET /api/app/agents — list booking assistant(s) for the clinic. Used by embed.
+ * POST /api/app/agents — create a booking assistant (name required). Max one per clinic.
+ */
 export async function GET(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  const token = authHeader?.replace("Bearer ", "").trim();
-  if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const ctx = await getClinicIdAndPlan(token);
-  if (!ctx) return NextResponse.json({ error: "No clinic" }, { status: 403 });
+  const ctx = await getClinicIdAndPlan(request);
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const admin = createAdminClient();
   const { data: agents, error } = await admin
@@ -65,12 +54,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  const token = authHeader?.replace("Bearer ", "").trim();
-  if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const ctx = await getClinicIdAndPlan(token);
-  if (!ctx) return NextResponse.json({ error: "No clinic" }, { status: 403 });
+  const ctx = await getClinicIdAndPlan(request);
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let body: { name?: string; location_id?: string | null };
   try {

@@ -1,19 +1,23 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyClinicSignature } from "@/lib/chat-signature";
-import { sendResendEmail } from "@/lib/resend";
-import { renderEmailHtml, escapeHtml } from "@/lib/email-template";
-import { sendWhatsApp } from "@/lib/whatsapp";
-import { hasPlanFeature } from "@/lib/plan-features";
+import { sendBookingConfirmationEmails } from "@/lib/send-booking-confirmation";
 import { isValidChatEmail, isValidChatPhone } from "@/lib/embed-validate";
-import { buildGoogleCalendarUrl } from "@/lib/google-calendar-url";
+import { checkEmbedApiRateLimit, getClientIp } from "@/lib/embed-api-rate-limit";
+import { validateAppointmentTimes } from "@/lib/embed-time-validate";
 
 /**
  * POST /api/embed/confirm-booking — create appointment from chat widget. Requires valid sig.
  * Body: { clinicSlug, sig, patient_email?, patient_name?, patient_phone?, start_time, end_time } (ISO times).
- * Sends confirmation email to patient and notifies clinic team. Elite: also sends WhatsApp to patient and clinic.
+ * Sends confirmation email to patient and notifies clinic team.
  */
 export async function POST(request: Request) {
+  const ip = getClientIp(request);
+  const { allowed } = await checkEmbedApiRateLimit(ip);
+  if (!allowed) {
+    return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
+  }
+
   let body: {
     clinicSlug?: string;
     sig?: string;
@@ -22,18 +26,24 @@ export async function POST(request: Request) {
     patient_phone?: string;
     start_time?: string;
     end_time?: string;
+    policy_accepted_at?: string;
   };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  const { clinicSlug, sig, patient_email, patient_name, patient_phone, start_time, end_time } = body;
+  const { clinicSlug, sig, patient_email, patient_name, patient_phone, start_time, end_time, policy_accepted_at } = body;
   if (!clinicSlug?.trim() || !sig?.trim() || !start_time?.trim() || !end_time?.trim()) {
     return NextResponse.json({ error: "clinicSlug, sig, start_time, end_time required" }, { status: 400 });
   }
   if (!verifyClinicSignature(clinicSlug.trim(), sig.trim())) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
+  }
+
+  const timeCheck = validateAppointmentTimes(start_time.trim(), end_time.trim());
+  if (!timeCheck.valid) {
+    return NextResponse.json({ error: timeCheck.error ?? "Invalid appointment times." }, { status: 400 });
   }
 
   const admin = createAdminClient();
@@ -53,7 +63,8 @@ export async function POST(request: Request) {
   const clinicId = (clinic as { id: string }).id;
   const clinicName = (clinic as { name: string }).name;
   const email = patient_email?.trim() || null;
-  const name = (patient_name?.trim() || "Patient") as string;
+  const rawName = patient_name?.trim() || "Patient";
+  const name = rawName.length > 200 ? rawName.slice(0, 200) : rawName;
   const rawPhone = patient_phone?.trim() || null;
 
   if (email) {
@@ -142,73 +153,33 @@ export async function POST(request: Request) {
       start_time: start_time.trim(),
       end_time: end_time.trim(),
       status: "scheduled",
+      ...(typeof policy_accepted_at === "string" && policy_accepted_at.trim() && {
+        policy_accepted_at: policy_accepted_at.trim(),
+      }),
     });
 
   if (apptErr) {
     return NextResponse.json({ error: apptErr.message }, { status: 500 });
   }
 
-  const startDate = new Date(start_time.trim()).toLocaleString(undefined, { dateStyle: "long", timeStyle: "short" });
-  const endDate = new Date(end_time.trim()).toLocaleString(undefined, { timeStyle: "short" });
-
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://dentraflow.com").replace(/\/$/, "");
-
   const clinicPlan = (clinic as { plan?: string }).plan;
   const isProOrElite = clinicPlan === "pro" || clinicPlan === "elite";
-  const gcalUrl =
-    isProOrElite && start_time && end_time
-      ? buildGoogleCalendarUrl({
-          title: `Appointment at ${clinicName}`,
-          start: start_time.trim(),
-          end: end_time.trim(),
-          details: clinicName,
-        })
-      : null;
-
-  if (patientEmail) {
-    await sendResendEmail({
-      to: patientEmail,
-      subject: `Appointment confirmed — ${clinicName}`,
-      html: renderEmailHtml({
-        greeting: name ? `Hi ${escapeHtml(name)},` : "Hi,",
-        body: `<p>Your appointment at <strong>${escapeHtml(clinicName)}</strong> is confirmed.</p><p><strong>When:</strong> ${escapeHtml(startDate)} – ${escapeHtml(endDate)}</p><p>Need to change or cancel later? Just type "change" or "cancel" in the chat on the clinic website.</p>`,
-        link: gcalUrl ? { text: "Add to Google Calendar", url: gcalUrl } : undefined,
-        footer: `— ${escapeHtml(clinicName)}`,
-      }),
-    });
+  const { data: members } = await admin.from("clinic_members").select("app_user_id").eq("clinic_id", clinicId);
+  const appUserIds = (members || []).map((m) => (m as { app_user_id: string | null }).app_user_id).filter(Boolean) as string[];
+  const clinicMemberEmails: string[] = [];
+  if (appUserIds.length > 0) {
+    const { data: users } = await admin.from("app_users").select("email").in("id", appUserIds);
+    for (const u of users ?? []) clinicMemberEmails.push((u as { email: string }).email);
   }
-
-  const { data: members } = await admin.from("clinic_members").select("user_id").eq("clinic_id", clinicId);
-  const emails: string[] = [];
-  for (const m of members || []) {
-    try {
-      const { data: { user } } = await admin.auth.admin.getUserById((m as { user_id: string }).user_id);
-      if (user?.email) emails.push(user.email);
-    } catch {
-      // skip
-    }
-  }
-  if (emails.length > 0) {
-    await sendResendEmail({
-      to: emails,
-      subject: `New appointment (from chat) — ${clinicName}`,
-      html: renderEmailHtml({
-        body: `<p>A new appointment was booked via the chat widget for <strong>${escapeHtml(clinicName)}</strong>.</p><p><strong>Patient:</strong> ${escapeHtml(name)}${patientEmail ? ` (${escapeHtml(patientEmail)})` : ""}</p><p><strong>When:</strong> ${escapeHtml(startDate)} – ${escapeHtml(endDate)}</p>`,
-        button: { text: "View appointments", url: `${appUrl}/app/appointments` },
-      }),
-    });
-  }
-
-  const clinicPhone = (clinic as { whatsapp_phone?: string | null; phone?: string | null }).whatsapp_phone?.trim()
-    || (clinic as { phone?: string | null }).phone?.trim();
-  if (hasPlanFeature(clinicPlan, "whatsApp") && clinicPhone && clinicPhone.replace(/\D/g, "").length >= 10) {
-    const staffMsg = `New appointment at ${clinicName}: ${name} — ${startDate} – ${endDate}.`;
-    sendWhatsApp({ to: clinicPhone, body: staffMsg }).catch((e) => console.error("WhatsApp to clinic:", e));
-    if (patientPhone && patientPhone.replace(/\D/g, "").length >= 10) {
-      const patientMsg = `Hi${name ? ` ${name}` : ""}, your appointment at ${clinicName} is confirmed for ${startDate} – ${endDate}. Reply if you need to change or cancel.`;
-      sendWhatsApp({ to: patientPhone, body: patientMsg }).catch((e) => console.error("WhatsApp to patient:", e));
-    }
-  }
+  await sendBookingConfirmationEmails({
+    clinicName,
+    patientName: name,
+    patientEmail,
+    startTime: start_time.trim(),
+    endTime: end_time.trim(),
+    isProOrElite,
+    clinicMemberEmails,
+  });
 
   return NextResponse.json({ ok: true });
 }

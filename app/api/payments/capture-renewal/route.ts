@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PLANS, type PlanId } from "@/lib/supabase/types";
 import { getCapturedAmountUsd, verifyCaptureAmountForPlan } from "@/lib/payment-verify";
+import { requireUser } from "@/lib/auth/app-auth";
 
 const PAYPAL_API = "https://api-m.paypal.com";
 
@@ -30,17 +30,12 @@ async function getAccessToken(): Promise<string> {
  */
 export async function POST(request: Request) {
   try {
-    const token = request.headers.get("authorization")?.replace("Bearer ", "");
-    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    const supabase = createClient(supabaseUrl, supabaseAnon);
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser(token);
-    if (userError || !user) return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+    let auth;
+    try {
+      auth = await requireUser();
+    } catch {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     let body: { orderId?: string; plan?: string; country?: string };
     try {
@@ -66,7 +61,7 @@ export async function POST(request: Request) {
     const { data: member } = await admin
       .from("clinic_members")
       .select("clinic_id")
-      .eq("user_id", user.id)
+      .eq("app_user_id", auth.user.id)
       .limit(1)
       .maybeSingle();
     if (!member?.clinic_id) {

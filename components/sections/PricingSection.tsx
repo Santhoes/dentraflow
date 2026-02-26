@@ -28,7 +28,7 @@ export function PricingSection() {
         >
           Choose a plan. Upgrade or downgrade anytime.
         </motion.p>
-        <div className="mt-10 grid grid-cols-1 gap-5 sm:mt-12 sm:gap-6 md:grid-cols-3 md:gap-6 lg:mt-16 lg:gap-8">
+        <div className="mt-10 grid grid-cols-1 gap-5 sm:mt-12 sm:gap-6 md:grid-cols-2 md:gap-6 lg:mt-16 lg:grid-cols-4 lg:gap-8">
           {PLANS.map((plan, i) => (
             <motion.div
               key={plan.id}
@@ -63,14 +63,13 @@ export function PricingSection() {
                   </li>
                 ))}
               </ul>
-              <Button
-                className="mt-8 w-full"
-                variant={plan.id === "pro" ? "default" : "secondary"}
-                size="lg"
-                asChild
-              >
-                <Link href={plan.id === "elite" ? "/signup?plan=elite" : `/signup?plan=${plan.id}`}>
-                  {plan.id === "elite" ? "Upgrade to Elite" : "Subscribe / Pay"}
+              <Button className="mt-8 w-full" variant={plan.id === "pro" ? "default" : "secondary"} size="lg" asChild>
+                <Link href={`/signup?plan=${plan.id}`}>
+                  {plan.id === "smart_booking"
+                    ? "Subscribe — Smart Booking Site"
+                    : plan.id === "elite"
+                    ? "Subscribe — Elite"
+                    : "Subscribe"}
                 </Link>
               </Button>
             </motion.div>

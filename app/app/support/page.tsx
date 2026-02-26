@@ -3,7 +3,6 @@
 import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useApp } from "@/lib/app-context";
-import { createClient } from "@/lib/supabase/client";
 import { MessageSquare, Send, Loader2, ChevronRight, Inbox } from "lucide-react";
 
 interface SupportCase {
@@ -27,13 +26,10 @@ export default function AppSupportPage() {
   const [loadingCases, setLoadingCases] = useState(true);
 
   const fetchCases = useCallback(async () => {
-    const supabase = createClient();
-    const { data, error: e } = await supabase
-      .from("support_messages")
-      .select("id, subject, body, created_at, admin_reply, admin_replied_at, status")
-      .order("created_at", { ascending: false })
-      .limit(100);
-    if (!e && data) setCases((data as SupportCase[]));
+    const res = await fetch("/api/app/support", { credentials: "include" });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && Array.isArray((data as { cases?: SupportCase[] }).cases))
+      setCases((data as { cases: SupportCase[] }).cases);
     setLoadingCases(false);
   }, []);
 
@@ -48,39 +44,15 @@ export default function AppSupportPage() {
     setError(null);
     setSent(false);
     try {
-      const supabase = createClient();
-      let {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) {
-        const { data: { session: refreshed } } = await supabase.auth.refreshSession();
-        session = refreshed ?? null;
-      }
-      const token = session?.access_token;
-      if (!token) {
-        setError("Please sign in again.");
-        setSending(false);
-        return;
-      }
-      let res = await fetch("/api/app/support", {
+      const res = await fetch("/api/app/support", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ subject: subject.trim() || undefined, message: message.trim() }),
       });
-      if (res.status === 401) {
-        const { data: { session: refreshed } } = await supabase.auth.refreshSession();
-        const newToken = refreshed?.access_token;
-        if (newToken) {
-          res = await fetch("/api/app/support", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${newToken}` },
-            body: JSON.stringify({ subject: subject.trim() || undefined, message: message.trim() }),
-          });
-        }
-      }
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || "Failed to create case.");
+        setError((data as { error?: string }).error || "Failed to create case.");
         setSending(false);
         return;
       }

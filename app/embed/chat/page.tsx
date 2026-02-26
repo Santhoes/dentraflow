@@ -28,8 +28,8 @@ export default function EmbedChatPage({
     <div
       style={{
         width: "100%",
-        minHeight: "100dvh",
-        background: "white",
+        minHeight: 0,
+        background: "transparent",
       }}
     >
       <EmbedChatClient

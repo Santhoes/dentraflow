@@ -32,6 +32,7 @@ interface AppointmentRow {
   status: string;
   patient_id: string;
   reason: string | null;
+  payment_status?: string;
   patient?: { full_name: string; email: string | null };
 }
 
@@ -58,7 +59,7 @@ function useUpcomingAppointments(
     const fromRow = (page - 1) * PAGE_SIZE;
     let q = supabase
       .from("appointments")
-      .select("id, start_time, end_time, status, patient_id, reason", { count: "exact" })
+      .select("id, start_time, end_time, status, patient_id, reason, payment_status", { count: "exact" })
       .eq("clinic_id", clinicId)
       .gte("start_time", from.toISOString())
       .lte("start_time", to.toISOString())
@@ -140,7 +141,7 @@ function usePastAppointments(
     const fromRow = (page - 1) * PAGE_SIZE;
     let q = supabase
       .from("appointments")
-      .select("id, start_time, end_time, status, patient_id, reason", { count: "exact" })
+      .select("id, start_time, end_time, status, patient_id, reason, payment_status", { count: "exact" })
       .eq("clinic_id", clinicId)
       .gte("start_time", from.toISOString())
       .lte("start_time", to.toISOString())
@@ -214,16 +215,14 @@ export default function AppAppointmentsPage() {
   const [pastPage, setPastPage] = useState(1);
   const [downloadingCompletedPdf, setDownloadingCompletedPdf] = useState(false);
   const [markPastRefresh, setMarkPastRefresh] = useState(0);
+  const [refundingId, setRefundingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!clinic?.id) return;
     const run = async () => {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) return;
       const res = await fetch("/api/app/appointments", {
         method: "PATCH",
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        credentials: "include",
       });
       if (res.ok) setMarkPastRefresh((k) => k + 1);
     };
@@ -345,6 +344,21 @@ export default function AppAppointmentsPage() {
     }
   }, [clinic, pastPeriod, formatDate]);
 
+  const handleMarkRefundSent = useCallback(async (apptId: string) => {
+    setRefundingId(apptId);
+    try {
+      const res = await fetch(`/api/app/appointments/${apptId}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mark_refunded: true }),
+      });
+      if (res.ok) setMarkPastRefresh((k) => k + 1);
+    } finally {
+      setRefundingId(null);
+    }
+  }, []);
+
   const handleAddAllUpcomingToCalendar = useCallback(() => {
     if (!clinic) return;
     const now = new Date();
@@ -446,18 +460,19 @@ export default function AppAppointmentsPage() {
                 <th className="px-3 py-2 font-semibold text-slate-900 dark:text-white sm:px-4 sm:py-3">Date & time</th>
                 <th className="px-3 py-2 font-semibold text-slate-900 dark:text-white sm:px-4 sm:py-3">Reason</th>
                 <th className="px-3 py-2 font-semibold text-slate-900 dark:text-white sm:px-4 sm:py-3">Status</th>
+                <th className="px-3 py-2 font-semibold text-slate-900 dark:text-white sm:px-4 sm:py-3">Actions</th>
               </tr>
             </thead>
             <tbody className="text-slate-700 dark:text-slate-200">
               {upcomingLoading ? (
                 <tr className="border-b border-slate-200 dark:border-slate-600">
-                  <td colSpan={5} className="px-3 py-6 text-center text-slate-500 dark:text-slate-400 sm:px-4 sm:py-8">
+                  <td colSpan={6} className="px-3 py-6 text-center text-slate-500 dark:text-slate-400 sm:px-4 sm:py-8">
                     <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                   </td>
                 </tr>
               ) : upcomingList.length === 0 ? (
                 <tr className="border-b border-slate-200 dark:border-slate-600">
-                  <td colSpan={5} className="px-3 py-6 text-center text-slate-500 dark:text-slate-400 sm:px-4 sm:py-8">
+                  <td colSpan={6} className="px-3 py-6 text-center text-slate-500 dark:text-slate-400 sm:px-4 sm:py-8">
                     No upcoming appointments in this period.
                   </td>
                 </tr>
@@ -481,6 +496,21 @@ export default function AppAppointmentsPage() {
                       <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs text-slate-700 dark:bg-slate-600 dark:text-slate-200">
                         {a.status}
                       </span>
+                    </td>
+                    <td className="px-3 py-2 sm:px-4 sm:py-3">
+                      {a.status === "cancelled" && a.payment_status === "paid" ? (
+                        <button
+                          type="button"
+                          onClick={() => handleMarkRefundSent(a.id)}
+                          disabled={refundingId === a.id}
+                          className="inline-flex min-h-[36px] items-center gap-1 rounded-lg border border-emerald-600 bg-emerald-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                        >
+                          {refundingId === a.id ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                          Notify: Refund sent
+                        </button>
+                      ) : a.status === "cancelled" && a.payment_status === "refunded" ? (
+                        <span className="text-xs text-slate-500">Refund notified</span>
+                      ) : null}
                     </td>
                   </tr>
                 ))
@@ -569,18 +599,19 @@ export default function AppAppointmentsPage() {
                 <th className="px-3 py-2 font-semibold text-slate-900 dark:text-white sm:px-4 sm:py-3">Date & time</th>
                 <th className="px-3 py-2 font-semibold text-slate-900 dark:text-white sm:px-4 sm:py-3">Reason</th>
                 <th className="px-3 py-2 font-semibold text-slate-900 dark:text-white sm:px-4 sm:py-3">Status</th>
+                <th className="px-3 py-2 font-semibold text-slate-900 dark:text-white sm:px-4 sm:py-3">Actions</th>
               </tr>
             </thead>
             <tbody className="text-slate-700 dark:text-slate-200">
               {pastLoading ? (
                 <tr className="border-b border-slate-200 dark:border-slate-600">
-                  <td colSpan={5} className="px-3 py-6 text-center text-slate-500 dark:text-slate-400 sm:px-4 sm:py-8">
+                  <td colSpan={6} className="px-3 py-6 text-center text-slate-500 dark:text-slate-400 sm:px-4 sm:py-8">
                     <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                   </td>
                 </tr>
               ) : pastList.length === 0 ? (
                 <tr className="border-b border-slate-200 dark:border-slate-600">
-                  <td colSpan={5} className="px-3 py-6 text-center text-slate-500 dark:text-slate-400 sm:px-4 sm:py-8">
+                  <td colSpan={6} className="px-3 py-6 text-center text-slate-500 dark:text-slate-400 sm:px-4 sm:py-8">
                     No completed appointments in this period.
                   </td>
                 </tr>
@@ -604,6 +635,21 @@ export default function AppAppointmentsPage() {
                       <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs text-slate-700 dark:bg-slate-600 dark:text-slate-200">
                         {a.status}
                       </span>
+                    </td>
+                    <td className="px-3 py-2 sm:px-4 sm:py-3">
+                      {a.status === "cancelled" && a.payment_status === "paid" ? (
+                        <button
+                          type="button"
+                          onClick={() => handleMarkRefundSent(a.id)}
+                          disabled={refundingId === a.id}
+                          className="inline-flex min-h-[36px] items-center gap-1 rounded-lg border border-emerald-600 bg-emerald-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                        >
+                          {refundingId === a.id ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                          Notify: Refund sent
+                        </button>
+                      ) : a.status === "cancelled" && a.payment_status === "refunded" ? (
+                        <span className="text-xs text-slate-500">Refund notified</span>
+                      ) : null}
                     </td>
                   </tr>
                 ))

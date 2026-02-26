@@ -1,8 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
-import type { User } from "@supabase/supabase-js";
+import type { AppUser } from "@/lib/auth/app-auth";
 
 export interface Clinic {
   id: string;
@@ -28,12 +27,17 @@ export interface Clinic {
   city: string | null;
   state: string | null;
   postal_code: string | null;
+  cancellation_policy_text: string | null;
+  paypal_merchant_id: string | null;
+  deposit_required: boolean;
+  require_policy_agreement: boolean;
+  deposit_rules_json: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }
 
 interface AppContextValue {
-  user: User | null;
+  user: AppUser | null;
   clinic: Clinic | null;
   loading: boolean;
   error: string | null;
@@ -43,62 +47,37 @@ interface AppContextValue {
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [clinic, setClinic] = useState<Clinic | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchClinic = useCallback(async (userId: string, clearIfMissing = true) => {
-    const supabase = createClient();
-    const { data: member, error: memberErr } = await supabase
-      .from("clinic_members")
-      .select("clinic_id")
-      .eq("user_id", userId)
-      .limit(1)
-      .maybeSingle();
-    if (memberErr || !member?.clinic_id) {
-      if (clearIfMissing) setClinic(null);
-      return;
-    }
-    const { data: c, error: clinicErr } = await supabase
-      .from("clinics")
-      .select("*")
-      .eq("id", (member as { clinic_id: string }).clinic_id)
-      .single();
-    if (clinicErr) {
-      if (clearIfMissing) setClinic(null);
-      return;
-    }
-    setClinic(c as Clinic);
+  const refetchClinic = useCallback(async () => {
+    const res = await fetch("/api/auth/me", { credentials: "include" });
+    const data = (await res.json()) as { user: AppUser | null; clinic: Clinic | null };
+    if (data.user) setUser(data.user);
+    setClinic(data.clinic ?? null);
   }, []);
 
-  const refetchClinic = useCallback(async () => {
-    if (user?.id) await fetchClinic(user.id);
-  }, [user?.id, fetchClinic]);
-
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session?.user) {
+    setLoading(true);
+    fetch("/api/auth/me", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data: { user: AppUser | null; clinic: Clinic | null }) => {
+        if (!data.user) {
+          setUser(null);
+          setClinic(null);
+          return;
+        }
+        setUser(data.user);
+        setClinic(data.clinic ?? null);
+      })
+      .catch(() => {
         setUser(null);
         setClinic(null);
-        setLoading(false);
-        return;
-      }
-      setUser(session.user);
-      fetchClinic(session.user.id).finally(() => setLoading(false));
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session?.user) {
-        setUser(null);
-        setClinic(null);
-        return;
-      }
-      setUser(session.user);
-      fetchClinic(session.user.id, false);
-    });
-    return () => subscription.unsubscribe();
-  }, [fetchClinic]);
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <AppContext.Provider

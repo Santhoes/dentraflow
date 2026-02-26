@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getAuthContextFromRequest } from "@/lib/auth/app-auth";
 import { slugFromName } from "@/lib/supabase/types";
 
 export async function POST(request: Request) {
   try {
+    const ctx = await getAuthContextFromRequest(request);
+    if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const body = await request.json();
     const { plan, clinicName, country, timezone, whatsapp_phone, workingHours } = body as {
       plan: string;
@@ -18,18 +21,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
     if (!whatsapp_phone?.trim()) {
-      return NextResponse.json({ error: "WhatsApp number is required" }, { status: 400 });
+      return NextResponse.json({ error: "Phone number is required" }, { status: 400 });
     }
-
-    const authHeader = request.headers.get("authorization");
-    const token = authHeader?.replace("Bearer ", "");
-    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    const supabase = createClient(supabaseUrl, supabaseAnon);
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !user) return NextResponse.json({ error: "Invalid session" }, { status: 401 });
 
     const admin = createAdminClient();
     const slug = slugFromName(clinicName);
@@ -53,7 +46,7 @@ export async function POST(request: Request) {
 
     const { error: memberError } = await admin.from("clinic_members").insert({
       clinic_id: clinic.id,
-      user_id: user.id,
+      app_user_id: ctx.user.id,
       role: "owner",
     });
     if (memberError) {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireAdmin } from "@/lib/admin-auth-server";
 
 /**
  * GET /api/admin/stats — summary counts for admin dashboard (admin only).

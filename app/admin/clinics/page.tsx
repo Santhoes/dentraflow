@@ -43,6 +43,7 @@ export default function AdminClinicsPage() {
     plan: "starter",
     plan_expires_at: "",
     phone: "",
+    ownerEmail: "",
   });
 
   const load = useCallback((p = page) => {
@@ -66,12 +67,13 @@ export default function AdminClinicsPage() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ name: "", country: "", timezone: "America/New_York", plan: "starter", plan_expires_at: "", phone: "" });
+    setForm({ name: "", country: "", timezone: "America/New_York", plan: "starter", plan_expires_at: "", phone: "", ownerEmail: "" });
     setModal("create");
   };
 
   const openEdit = (c: ClinicRow) => {
     setEditing(c);
+    const owner = c.staff.find((s) => s.role === "owner")?.email ?? "";
     setForm({
       name: c.name,
       country: c.country || "",
@@ -79,6 +81,7 @@ export default function AdminClinicsPage() {
       plan: c.plan || "starter",
       plan_expires_at: c.plan_expires_at ? c.plan_expires_at.slice(0, 10) : "",
       phone: c.phone || "",
+      ownerEmail: owner && owner !== "(unknown)" ? owner : "",
     });
     setModal("edit");
   };
@@ -87,7 +90,7 @@ export default function AdminClinicsPage() {
     if (!form.name.trim() || !form.country.trim()) return;
     setSaving(true);
     try {
-      await adminFetch("/clinics", {
+      const created = (await adminFetch("/clinics", {
         method: "POST",
         body: JSON.stringify({
           name: form.name.trim(),
@@ -97,7 +100,17 @@ export default function AdminClinicsPage() {
           plan_expires_at: form.plan_expires_at.trim() || null,
           phone: form.phone.trim() || null,
         }),
-      });
+      })) as { clinic?: { id?: string } };
+
+      const clinicId = created?.clinic?.id;
+      const ownerEmail = form.ownerEmail.trim().toLowerCase();
+      if (clinicId && ownerEmail) {
+        await adminFetch(`/clinics/${clinicId}/owner`, {
+          method: "PATCH",
+          body: JSON.stringify({ email: ownerEmail }),
+        });
+      }
+
       setModal(null);
       load(1);
       setPage(1);
@@ -123,6 +136,16 @@ export default function AdminClinicsPage() {
           phone: form.phone.trim() || null,
         }),
       });
+
+      const currentOwner = editing.staff.find((s) => s.role === "owner")?.email?.trim().toLowerCase() ?? "";
+      const nextOwner = form.ownerEmail.trim().toLowerCase();
+      if (nextOwner && nextOwner !== currentOwner) {
+        await adminFetch(`/clinics/${editing.id}/owner`, {
+          method: "PATCH",
+          body: JSON.stringify({ email: nextOwner }),
+        });
+      }
+
       setModal(null);
       setEditing(null);
       load(page);
@@ -176,6 +199,7 @@ export default function AdminClinicsPage() {
                     <th className="px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">Country</th>
                     <th className="px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">Plan</th>
                     <th className="px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">Expires</th>
+                    <th className="px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">Owner</th>
                     <th className="px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">Staff</th>
                     <th className="px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">Actions</th>
                   </tr>
@@ -195,13 +219,16 @@ export default function AdminClinicsPage() {
                       <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{c.country || "—"}</td>
                       <td className="px-4 py-3">
                         <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary dark:bg-primary/20">
-                          {c.plan}
+                          {PLANS.find((p) => p.id === c.plan)?.name ?? c.plan}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
                         {c.plan_expires_at
                           ? new Date(c.plan_expires_at).toLocaleDateString(undefined, { dateStyle: "medium" })
                           : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
+                        {c.staff.find((s) => s.role === "owner")?.email || "—"}
                       </td>
                       <td className="px-4 py-3">
                         {c.staff.length === 0 ? (
@@ -282,6 +309,19 @@ export default function AdminClinicsPage() {
               {modal === "create" ? "Create clinic" : "Edit clinic"}
             </h2>
             <div className="mt-4 space-y-4 min-h-0 overflow-y-auto flex-1">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Owner email (optional)</label>
+                <input
+                  type="email"
+                  value={form.ownerEmail}
+                  onChange={(e) => setForm((f) => ({ ...f, ownerEmail: e.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                  placeholder="owner@clinic.com"
+                />
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Sets the clinic’s <span className="font-medium">owner</span> role (used for access + reminders).
+                </p>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Name</label>
                 <input

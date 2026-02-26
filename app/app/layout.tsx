@@ -72,8 +72,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
   }, []);
 
   const handleSignOut = async () => {
-    const supabase = (await import("@/lib/supabase/client")).createClient();
-    await supabase.auth.signOut();
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     router.replace("/login");
   };
 

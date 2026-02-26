@@ -2,12 +2,19 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyClinicSignature } from "@/lib/chat-signature";
 import { getNextSlots, getSlotsForDate, getNextDaysWithSlots } from "@/lib/embed-slots";
+import { checkEmbedApiRateLimit, getClientIp } from "@/lib/embed-api-rate-limit";
 
 /**
  * GET /api/embed/slots?clinicSlug=...&sig=...&location=...&agent=...
  * Optional: date=YYYY-MM-DD — return slots for that day only. Otherwise returns next 5 slots.
  */
 export async function GET(request: Request) {
+  const ip = getClientIp(request);
+  const { allowed } = await checkEmbedApiRateLimit(ip);
+  if (!allowed) {
+    return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
+  }
+
   const { searchParams } = new URL(request.url);
   const clinicSlug = searchParams.get("clinicSlug")?.trim();
   const sig = searchParams.get("sig")?.trim();
@@ -77,6 +84,8 @@ export async function GET(request: Request) {
 
   const modeDays = searchParams.get("days") === "1";
   const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(dateParam || "");
+  const durationParam = searchParams.get("duration")?.trim();
+  const durationMinutes = durationParam ? Math.max(15, Math.min(480, parseInt(durationParam, 10) || 30)) : 30;
   let slots: { label: string; start: string; end: string }[] = [];
   let hasSlotsToday = false;
   let workingDays: { dateStr: string; label: string }[] = [];
@@ -88,7 +97,7 @@ export async function GET(request: Request) {
   }
 
   if (isDateOnly) {
-    slots = getSlotsForDate(workingHours, timezone, dateParam!, existingStarts, 24, true).map((s) => ({
+    slots = getSlotsForDate(workingHours, timezone, dateParam!, existingStarts, 24, true, durationMinutes).map((s) => ({
       label: s.label,
       start: s.start,
       end: s.end,

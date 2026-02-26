@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useApp } from "@/lib/app-context";
-import { createClient } from "@/lib/supabase/client";
 import {
   CreditCard,
   Loader2,
@@ -26,11 +25,12 @@ const RENEW_COUNTRY_STORAGE_KEY = "dentraflow_renew_payer_country";
 interface PaymentRow {
   id: string;
   amount: number;
-  plan: string;
+  plan: string | null;
   created_at: string;
   status: string;
   tax_amount?: number | null;
   country?: string | null;
+  appointment_id?: string | null;
 }
 
 export default function AppPlanPage() {
@@ -51,32 +51,24 @@ export default function AppPlanPage() {
   useEffect(() => {
     if (!clinic?.id) return;
     setLoading(true);
-    const supabase = createClient();
     const { from, to } = getRange(period);
-    const fromRow = (page - 1) * PAGE_SIZE;
-    let q = supabase
-      .from("payments")
-      .select("id, amount, plan, created_at, status, tax_amount, country", { count: "exact" })
-      .eq("clinic_id", clinic.id)
-      .gte("created_at", from.toISOString())
-      .lte("created_at", to.toISOString())
-      .order("created_at", { ascending: false })
-      .range(fromRow, fromRow + PAGE_SIZE - 1);
-    void Promise.resolve(
-      q.then(({ data, count, error }) => {
-        if (error) {
-          setPayments([]);
-          setTotalCount(0);
-          return;
-        }
-        setPayments((data as PaymentRow[]) || []);
-        setTotalCount(count ?? 0);
-      })
-    ).finally(() => setLoading(false)).catch(() => {
-      setPayments([]);
-      setTotalCount(0);
-      setLoading(false);
+    const params = new URLSearchParams({
+      from: from.toISOString(),
+      to: to.toISOString(),
+      page: String(page),
+      limit: String(PAGE_SIZE),
     });
+    fetch(`/api/app/payments?${params}`, { credentials: "include" })
+      .then((res) => (res.ok ? res.json() : { payments: [], total: 0 }))
+      .then((data: { payments?: PaymentRow[]; total?: number }) => {
+        setPayments(data.payments ?? []);
+        setTotalCount(data.total ?? 0);
+      })
+      .catch(() => {
+        setPayments([]);
+        setTotalCount(0);
+      })
+      .finally(() => setLoading(false));
   }, [clinic?.id, page, period]);
 
   useEffect(() => {
@@ -124,28 +116,17 @@ export default function AppPlanPage() {
     window.history.replaceState({}, "", "/app/plan");
 
     setRenewing(true);
-    createClient()
-      .auth.getSession()
-      .then(({ data: { session } }) => {
-        if (!session?.access_token) {
-          setToast({ message: "Session expired. Please log in again.", type: "error" });
-          setRenewing(false);
-          return;
-        }
-        return fetch("/api/payments/capture-renewal", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            orderId,
-            plan,
-            country: savedPayerCountry || undefined,
-          }),
-        });
-      })
-      .then((r) => (r?.ok ? r.json() : r?.json().then((d) => ({ error: d?.error || "Capture failed" }))))
+    fetch("/api/payments/capture-renewal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        orderId,
+        plan,
+        country: savedPayerCountry || undefined,
+      }),
+    })
+      .then((r) => (r.ok ? r.json() : r.json().then((d) => ({ error: d?.error || "Capture failed" }))))
       .then((data) => {
         if (data?.error) {
           const msg = (data as { error?: string }).error || "Failed to change plan.";
@@ -168,20 +149,12 @@ export default function AppPlanPage() {
     setRenewing(true);
     setToast(null);
     try {
-      const { data: { session } } = await createClient().auth.getSession();
-      if (!session?.access_token) {
-        setToast({ message: "Please log in again.", type: "error" });
-        setRenewing(false);
-        return;
-      }
       sessionStorage.setItem(RENEW_STORAGE_KEY, clinic.plan);
       sessionStorage.setItem(RENEW_COUNTRY_STORAGE_KEY, payerCountry || clinic.country || "");
       const res = await fetch("/api/payments/create-renewal-order", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ plan: clinic.plan, country: payerCountry || clinic.country || undefined }),
       });
       const data = await res.json();
@@ -206,20 +179,12 @@ export default function AppPlanPage() {
       setSubscribingPlanId(planId);
       setToast(null);
       try {
-        const { data: { session } } = await createClient().auth.getSession();
-        if (!session?.access_token) {
-          setToast({ message: "Please log in again.", type: "error" });
-          setSubscribingPlanId(null);
-          return;
-        }
         sessionStorage.setItem(RENEW_STORAGE_KEY, planId);
         sessionStorage.setItem(RENEW_COUNTRY_STORAGE_KEY, payerCountry || clinic.country || "");
         const res = await fetch("/api/payments/create-renewal-order", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({ plan: planId, country: payerCountry || clinic.country || undefined }),
         });
         const data = await res.json();
@@ -242,25 +207,24 @@ export default function AppPlanPage() {
     setDownloadingPdf(true);
     try {
       const { from, to } = getRange(period);
-      const supabase = createClient();
       const allRows: PaymentRow[] = [];
-      let offset = 0;
       const batchSize = 500;
+      let page = 1;
       let hasMore = true;
       while (hasMore) {
-        const { data, error } = await supabase
-          .from("payments")
-          .select("id, amount, plan, created_at, status, tax_amount")
-          .eq("clinic_id", clinic.id)
-          .gte("created_at", from.toISOString())
-          .lte("created_at", to.toISOString())
-          .order("created_at", { ascending: false })
-          .range(offset, offset + batchSize - 1);
-        if (error) throw error;
-        const rows = (data || []) as PaymentRow[];
+        const params = new URLSearchParams({
+          from: from.toISOString(),
+          to: to.toISOString(),
+          page: String(page),
+          limit: String(batchSize),
+        });
+        const res = await fetch(`/api/app/payments?${params}`, { credentials: "include" });
+        if (!res.ok) throw new Error("Failed to fetch payments");
+        const data = (await res.json()) as { payments?: PaymentRow[] };
+        const rows = data.payments ?? [];
         allRows.push(...rows);
         hasMore = rows.length === batchSize;
-        offset += batchSize;
+        page += 1;
       }
       const { jsPDF } = await import("jspdf");
       const autoTable = (await import("jspdf-autotable")).default;
@@ -278,7 +242,7 @@ export default function AppPlanPage() {
         head: [["Date", "Plan", "Amount", "Tax", "Status"]],
         body: allRows.map((p) => [
           new Date(p.created_at).toLocaleDateString(undefined, { dateStyle: "medium" }),
-          p.plan,
+          p.plan ?? (p.appointment_id ? "Paid booking" : "—"),
           `$${Number(p.amount).toFixed(2)}`,
           p.tax_amount != null && p.tax_amount > 0 ? `$${Number(p.tax_amount).toFixed(2)}` : "—",
           p.status,
@@ -604,7 +568,7 @@ export default function AppPlanPage() {
                     <td className="px-3 py-2 sm:px-4 sm:py-3">
                       {new Date(p.created_at).toLocaleDateString(undefined, { dateStyle: "medium" })}
                     </td>
-                    <td className="px-3 py-2 sm:px-4 sm:py-3">{p.plan}</td>
+                    <td className="px-3 py-2 sm:px-4 sm:py-3">{p.plan ?? (p.appointment_id ? "Paid booking" : "—")}</td>
                     <td className="px-3 py-2 font-medium sm:px-4 sm:py-3">${Number(p.amount).toFixed(2)}</td>
                     <td className="px-3 py-2 text-slate-600 dark:text-slate-300 sm:px-4 sm:py-3">
                       {p.tax_amount != null && p.tax_amount > 0 ? `$${Number(p.tax_amount).toFixed(2)}` : "—"}

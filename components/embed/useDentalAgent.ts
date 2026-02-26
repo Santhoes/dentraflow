@@ -1,15 +1,17 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { isValidChatEmail, isValidChatPhone } from "@/lib/embed-validate";
+import { isValidChatEmail } from "@/lib/embed-validate";
 import { buildGoogleCalendarUrl } from "@/lib/google-calendar-url";
 
 export type DentalAgentState =
   | "GREETING"
   | "BOOKING_REASON"
   | "BOOKING_DATE"
+  | "BOOKING_PERIOD"
   | "BOOKING_TIME"
   | "PATIENT_DETAILS"
+  | "POLICY_AGREEMENT"
   | "VERIFY_ACCOUNT"
   | "MANAGE_BOOKING"
   | "CLINIC_INFO"
@@ -46,6 +48,8 @@ export interface ClinicInfo {
   landmark?: string;
   /** IANA timezone (e.g. America/New_York). Used so patients always see times in clinic timezone. */
   timezone?: string;
+  /** Shown before payment when deposit required; used for policy agreement step. */
+  cancellation_policy_text?: string;
 }
 
 const FIXED_SERVICES: SuggestionItem[] = [
@@ -55,6 +59,8 @@ const FIXED_SERVICES: SuggestionItem[] = [
   { key: "root_canal", label: "Root canal" },
   { key: "other", label: "Other" },
 ];
+
+const DEFAULT_SLOT_DURATION_MINUTES = 30;
 
 function toYYYYMMDD(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -70,23 +76,70 @@ function formatInClinicTz(isoString: string, timezone: string | undefined): stri
   });
 }
 
+const DAY_ORDER = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
+const DAY_LABELS: Record<string, string> = { mon: "Mon", tue: "Tue", wed: "Wed", thu: "Thu", fri: "Fri", sat: "Sat", sun: "Sun" };
+
+/** Format time "09:00" / "17:00" to readable "9:00 AM" / "5:00 PM". */
+function formatTimeRange(open: string, close: string): string {
+  const toDisplay = (t: string) => {
+    const [h, m] = t.split(":").map(Number);
+    const hour = h ?? 0;
+    const min = m ?? 0;
+    const ampm = hour >= 12 ? "PM" : "AM";
+    const h12 = hour % 12 || 12;
+    return `${h12}:${min.toString().padStart(2, "0")} ${ampm}`;
+  };
+  return `${toDisplay(open)}–${toDisplay(close)}`;
+}
+
+/** Format working_hours into a readable string (e.g. "Mon–Fri 9:00 AM–5:00 PM, Sat 9:00 AM–1:00 PM"). */
+function formatWorkingHours(working_hours: Record<string, { open: string; close: string }> | undefined): string {
+  if (!working_hours || Object.keys(working_hours).length === 0) return "Mon–Sat, 8am–6pm";
+  const entries = DAY_ORDER.filter((d) => working_hours[d]?.open && working_hours[d]?.close).map((day) => ({
+    day,
+    label: DAY_LABELS[day] ?? day,
+    range: formatTimeRange(working_hours[day].open, working_hours[day].close),
+  }));
+  if (entries.length === 0) return "Mon–Sat, 8am–6pm";
+  const parts: string[] = [];
+  let i = 0;
+  while (i < entries.length) {
+    const start = i;
+    const range = entries[i].range;
+    while (i + 1 < entries.length && entries[i + 1].range === range) i++;
+    const end = i;
+    if (start === end) parts.push(`${entries[start].label} ${range}`);
+    else parts.push(`${entries[start].label}–${entries[end].label} ${range}`);
+    i++;
+  }
+  return parts.join(", ");
+}
+
 const GREETING_MSG = "Hi 👋 How can i help you today?";
 const MSG_PATIENT_DETAILS = "Enter your full name.";
 const MSG_BOOKING_REASON = "What do you need? Pick a reason.";
 const MSG_VERIFY_EMAIL = "Enter the email you used to book.";
-const MSG_CHOOSE_SLOT = "Choose a time slot:";
+const MSG_CHOOSE_PERIOD = "Morning, afternoon, or evening?";
+const MSG_CHOOSE_SLOT = "Choose a time:";
 const MSG_NO_APPT = "No booking for this email. Book a new one?";
 const MSG_TRY_AGAIN = "Not found. Please try again.";
 const MSG_ENTER_EMAIL = "Thanks! Enter your email.";
-const MSG_ENTER_WHATSAPP = "Enter your WhatsApp number (with country code, e.g. +1234567890).";
-const MSG_NAME_EMAIL_CONTINUE = "Enter your email to continue.";
 const MSG_BOOKING_FAILED = "Booking failed. Please try again.";
 const MSG_BOOKING_FAILED_LAST = "Something went wrong. You can start a new booking or go back.";
-const MSG_CANCELLED = "Your appointment has been cancelled. We hope to see you soon!";
+const MSG_CANCELLED = "Your appointment has been cancelled. If you paid a deposit, the clinic will contact you about any refund. We hope to see you soon!";
 const MSG_CANNOT_CANCEL = "Could not cancel.";
 const MSG_CALL_CLINIC = "Please call the clinic.";
 const MSG_RESCHEDULED = "Rescheduled! Confirmation sent. How else can we help?";
 const MSG_CANNOT_RESCHEDULE = "Could not reschedule. Please call the clinic.";
+
+const MSG_POLICY_AGREEMENT = "Please agree to the clinic's cancellation and refund policy to continue.";
+const MSG_POLICY_CHECK_REQUIRED = "Please check the box to agree to the cancellation and refund policy.";
+
+export interface ServiceSuggestion {
+  key: string;
+  label: string;
+  duration_minutes: number;
+}
 
 export interface UseDentalAgentConfig {
   clinicSlug: string;
@@ -97,10 +150,18 @@ export interface UseDentalAgentConfig {
   /** Pro or Elite: show Add to Google Calendar after booking. */
   isProOrElite?: boolean;
   clinicInfo: ClinicInfo;
+  /** Appointment types from settings (name + duration). Used as chips (no time in label) and for slot length. */
+  serviceSuggestions?: ServiceSuggestion[] | null;
+  /** When true, show policy agreement step before confirm. When false (free booking or clinic disabled), skip agreement. */
+  requirePolicyAgreement?: boolean;
 }
 
 export function useDentalAgent(config: UseDentalAgentConfig) {
-  const { clinicSlug, sig, locationId, agentId, isElitePlan, isProOrElite, clinicInfo } = config;
+  const { clinicSlug, sig, locationId, agentId, isElitePlan, isProOrElite, clinicInfo, serviceSuggestions, requirePolicyAgreement = false } = config;
+  const bookingReasonSuggestions: SuggestionItem[] =
+    serviceSuggestions && serviceSuggestions.length > 0
+      ? serviceSuggestions.map((s) => ({ key: s.key, label: s.label }))
+      : FIXED_SERVICES;
   const [currentState, setCurrentState] = useState<DentalAgentState>("GREETING");
   const [message, setMessage] = useState(GREETING_MSG);
   const [messages, setMessages] = useState<ChatMessage[]>([{ id: "0", role: "ai", text: GREETING_MSG }]);
@@ -108,19 +169,25 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
   const [isInputDisabled, setIsInputDisabled] = useState(true);
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   const [slotSuggestions, setSlotSuggestions] = useState<SuggestionItem[]>([]);
+  /** All slots for the selected date (used to filter by period). */
+  const [allSlotsForDate, setAllSlotsForDate] = useState<SuggestionItem[]>([]);
+  /** Period chips (Morning, Afternoon, Evening) when in BOOKING_PERIOD. */
+  const [periodSuggestions, setPeriodSuggestions] = useState<SuggestionItem[]>([]);
 
   // Booking flow context
   const [selectedService, setSelectedService] = useState<string | null>(null);
+  const [selectedServiceDuration, setSelectedServiceDuration] = useState<number>(DEFAULT_SLOT_DURATION_MINUTES);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<{ start: string; end: string } | null>(null);
   const [patientName, setPatientName] = useState<string | null>(null);
   const [patientEmail, setPatientEmail] = useState<string | null>(null);
   const [verifiedAppointments, setVerifiedAppointments] = useState<VerifiedAppointment[]>([]);
   const [verifiedPatientEmail, setVerifiedPatientEmail] = useState<string | null>(null);
-  const [patientDetailsStep, setPatientDetailsStep] = useState<"name" | "email" | "whatsapp">("name");
-  const [patientWhatsApp, setPatientWhatsApp] = useState<string | null>(null);
+  const [patientDetailsStep, setPatientDetailsStep] = useState<"name" | "email">("name");
+  const [patientPhone, setPatientPhone] = useState<string | null>(null);
   const [verifyAttemptCount, setVerifyAttemptCount] = useState(0);
   const [bookingFailCount, setBookingFailCount] = useState(0);
+  const [policyAgreed, setPolicyAgreed] = useState(false);
 
   const isEmbed =
     typeof window !== "undefined" &&
@@ -159,6 +226,10 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
 
   // Initialize suggestions for GREETING; BOOKING_TIME shows slots + Back (no duplicate)
   const backChip: SuggestionItem = { key: "back", label: "Back", variant: "secondary" };
+  const lockedSuggestions: SuggestionItem[] = [
+    { key: "book", label: "Book Appointment", variant: "primary" },
+    backChip,
+  ];
   const bookingTimeSuggestions =
     slotSuggestions.some((s) => s.key === "back")
       ? slotSuggestions
@@ -172,24 +243,30 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
 
   const fetchSlots = useCallback(
     async (
-      dateStr: string | null
-    ): Promise<{ slots: SuggestionItem[]; hasSlotsToday?: boolean }> => {
+      dateStr: string | null,
+      durationMinutes?: number
+    ): Promise<{ slots: SuggestionItem[]; hasSlotsToday?: boolean; fetchFailed?: boolean }> => {
       const params = new URLSearchParams({ clinicSlug, sig });
       if (locationId) params.set("location", locationId);
       if (agentId) params.set("agent", agentId);
       if (dateStr) params.set("date", dateStr);
-      const res = await fetch(`${baseUrl}/api/embed/slots?${params}`);
-      if (!res.ok) return { slots: [] };
-      const data = (await res.json()) as {
-        slots?: { label: string; start: string; end: string }[];
-        hasSlotsToday?: boolean;
-      };
-      const slots = (data.slots || []).map((s) => ({
-        key: s.start,
-        label: s.label,
-        value: s.start,
-      }));
-      return { slots, hasSlotsToday: data.hasSlotsToday };
+      if (durationMinutes != null && durationMinutes > 0) params.set("duration", String(durationMinutes));
+      try {
+        const res = await fetch(`${baseUrl}/api/embed/slots?${params}`);
+        if (!res.ok) return { slots: [], fetchFailed: true };
+        const data = (await res.json()) as {
+          slots?: { label: string; start: string; end: string }[];
+          hasSlotsToday?: boolean;
+        };
+        const slots = (data.slots || []).map((s) => ({
+          key: s.start,
+          label: s.label,
+          value: s.start,
+        }));
+        return { slots, hasSlotsToday: data.hasSlotsToday };
+      } catch {
+        return { slots: [], fetchFailed: true };
+      }
     },
     [baseUrl, clinicSlug, sig, locationId, agentId]
   );
@@ -211,7 +288,8 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
   const onChipSelect = useCallback(
     async (key: string, label: string, value?: string) => {
       if (currentState === "BOOKING_TIME" && value) {
-        const end = new Date(new Date(value).getTime() + 30 * 60 * 1000).toISOString();
+        const durationMs = selectedServiceDuration * 60 * 1000;
+        const end = new Date(new Date(value).getTime() + durationMs).toISOString();
         setSelectedSlot({ start: value, end });
         setIsInputDisabled(false);
         setPatientDetailsStep("name");
@@ -227,20 +305,14 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
         case "GREETING":
           if (key === "book") {
             setBookingFailCount(0);
-            setStateWithMessageAndSuggestions("BOOKING_REASON", MSG_BOOKING_REASON, FIXED_SERVICES);
+            setStateWithMessageAndSuggestions("BOOKING_REASON", MSG_BOOKING_REASON, bookingReasonSuggestions);
           } else if (key === "change_cancel") {
             setIsInputDisabled(false);
             setStateWithMessageAndSuggestions("VERIFY_ACCOUNT", MSG_VERIFY_EMAIL, []);
           } else if (key === "clinic_info") {
-            const hours =
-              clinicInfo.working_hours && Object.keys(clinicInfo.working_hours).length
-                ? Object.entries(clinicInfo.working_hours)
-                    .filter(([, h]) => h?.open && h?.close)
-                    .map(([day, h]) => `${day}: ${h.open}–${h.close}`)
-                    .join(". ")
-                : "Mon–Sat, 8am–6pm";
-            const loc = [clinicInfo.address, clinicInfo.landmark].filter(Boolean).join(". ") || "";
-            const msg = `We're at ${loc || "our clinic"}. Hours: ${hours}. Book?`;
+            const hours = formatWorkingHours(clinicInfo.working_hours);
+            const address = [clinicInfo.address, clinicInfo.landmark].filter(Boolean).join(". ").trim() || "our clinic";
+            const msg = `We're at ${address}.\n\nHours: ${hours}.\n\nBook an appointment?`;
             setStateWithMessageAndSuggestions("CLINIC_INFO", msg, [
               { key: "book", label: "Book Appointment", variant: "primary" },
               backChip,
@@ -255,13 +327,41 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
 
         case "BOOKING_REASON":
           setSelectedService(label);
-          setStateWithMessageAndSuggestions("BOOKING_DATE", "When would you like to come? Pick a day.", []);
+          const serviceItem = serviceSuggestions?.find((s) => s.key === key || s.label === label);
+          setSelectedServiceDuration(serviceItem?.duration_minutes ?? DEFAULT_SLOT_DURATION_MINUTES);
+          setStateWithMessageAndSuggestions("BOOKING_DATE", "When would you like to come? Pick a day.", [backChip]);
           setIsLoadingSlots(true);
           fetchWorkingDays().then((dateChips) => {
             setStateOnlySuggestions("BOOKING_DATE", [...dateChips, backChip]);
             setSuggestions([...dateChips, backChip]);
             setIsLoadingSlots(false);
           });
+          break;
+
+        case "BOOKING_PERIOD":
+          if (key === "back") {
+            setAllSlotsForDate([]);
+            setPeriodSuggestions([]);
+            setCurrentState("BOOKING_DATE");
+            setMessage("When would you like to come? Pick a day.");
+            setSuggestions([backChip]);
+            appendMessage("ai", "When would you like to come? Pick a day.");
+            fetchWorkingDays().then((dateChips) => {
+              setStateOnlySuggestions("BOOKING_DATE", [...dateChips, backChip]);
+              setSuggestions([...dateChips, backChip]);
+            });
+          } else if (key === "Morning" || key === "Afternoon" || key === "Evening") {
+            const filtered = allSlotsForDate.filter((s) => s.label.startsWith(`${key} `));
+            const timeOnlySlots = filtered.map((s) => ({
+              ...s,
+              label: s.label.replace(/^(Morning|Afternoon|Evening) /, ""),
+              variant: "primary" as const,
+            }));
+            setSlotSuggestions([...timeOnlySlots, backChip]);
+            setStateOnlySuggestions("BOOKING_TIME", []);
+            setMessage(MSG_CHOOSE_SLOT);
+            appendMessage("ai", MSG_CHOOSE_SLOT);
+          }
           break;
 
         case "BOOKING_DATE":
@@ -273,19 +373,30 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
             setIsLoadingSlots(false);
             break;
           }
-          const { slots: slotList } = await fetchSlots(dateStrForSlots);
+          const { slots: slotList, fetchFailed } = await fetchSlots(dateStrForSlots, selectedServiceDuration);
           setIsLoadingSlots(false);
           if (slotList.length === 0) {
-            setMessage("No slots available for this day. Pick another date.");
-            appendMessage("ai", "No slots available for this day. Pick another date.");
+            const noSlotsMsg = fetchFailed
+              ? "Couldn't load slots. Please try again or pick another date."
+              : "No slots available for this day. Pick another date.";
+            setMessage(noSlotsMsg);
+            appendMessage("ai", noSlotsMsg);
             const backOnly: SuggestionItem[] = [backChip];
             setSlotSuggestions(backOnly);
             setStateOnlySuggestions("BOOKING_TIME", backOnly);
           } else {
-            setSlotSuggestions(slotList.map((s) => ({ ...s, variant: "primary" as const })));
-            setStateOnlySuggestions("BOOKING_TIME", []);
-            setMessage(MSG_CHOOSE_SLOT);
-            appendMessage("ai", MSG_CHOOSE_SLOT);
+            const withVariant = slotList.map((s) => ({ ...s, variant: "primary" as const }));
+            setAllSlotsForDate(withVariant);
+            const periods = [...new Set(withVariant.map((s) => s.label.split(" ")[0]))].filter(
+              (p): p is string => p === "Morning" || p === "Afternoon" || p === "Evening"
+            );
+            const periodChips: SuggestionItem[] = [
+              ...periods.map((p) => ({ key: p, label: p, variant: "primary" as const })),
+              backChip,
+            ];
+            setPeriodSuggestions(periodChips);
+            setSlotSuggestions([]);
+            setStateWithMessageAndSuggestions("BOOKING_PERIOD", MSG_CHOOSE_PERIOD, periodChips);
           }
           break;
 
@@ -301,6 +412,7 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
 
         case "VERIFY_ACCOUNT":
           setVerifyAttemptCount(0);
+          setIsInputDisabled(false);
           if (key === "back") {
             setCurrentState("GREETING");
             setMessage(GREETING_MSG);
@@ -308,13 +420,14 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
             appendMessage("ai", GREETING_MSG);
           } else if (key === "book") {
             setBookingFailCount(0);
-            setStateWithMessageAndSuggestions("BOOKING_REASON", MSG_BOOKING_REASON, FIXED_SERVICES);
+            setStateWithMessageAndSuggestions("BOOKING_REASON", MSG_BOOKING_REASON, bookingReasonSuggestions);
           }
           break;
       }
     },
     [
       currentState,
+      selectedServiceDuration,
       baseUrl,
       clinicSlug,
       sig,
@@ -323,6 +436,9 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
       setStateWithMessageAndSuggestions,
       setStateOnlySuggestions,
       fetchSlots,
+      fetchWorkingDays,
+      bookingReasonSuggestions,
+      serviceSuggestions,
     ]
   );
 
@@ -365,6 +481,7 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
             const nextAttempt = verifyAttemptCount + 1;
             setVerifyAttemptCount(nextAttempt);
             if (nextAttempt >= 3) {
+              setIsInputDisabled(true);
               setStateWithMessageAndSuggestions("VERIFY_ACCOUNT", apiError ?? "No booking found for this email. You can book a new appointment or go back.", [
                 { key: "book", label: "Book Appointment", variant: "primary" },
                 backChip,
@@ -378,6 +495,7 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
           const nextAttempt = verifyAttemptCount + 1;
           setVerifyAttemptCount(nextAttempt);
           if (nextAttempt >= 3) {
+            setIsInputDisabled(true);
             setStateWithMessageAndSuggestions("VERIFY_ACCOUNT", "Something went wrong. You can book a new appointment or go back.", [
               { key: "book", label: "Book Appointment", variant: "primary" },
               backChip,
@@ -403,7 +521,7 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
         }
         if (patientDetailsStep === "email") {
           const emailMatch = trimmed.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
-          const email = emailMatch ? emailMatch[0] : trimmed;
+          const email = emailMatch ? emailMatch[0].trim().toLowerCase() : trimmed.trim().toLowerCase();
           const emailCheck = isValidChatEmail(email);
           if (!emailCheck.valid) {
             setMessage(emailCheck.error ?? "Please enter a valid email.");
@@ -411,111 +529,24 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
             return;
           }
           setPatientEmail(email);
-          if (isElitePlan) {
-            setPatientDetailsStep("whatsapp");
-            setMessage(MSG_ENTER_WHATSAPP);
-            appendMessage("ai", MSG_ENTER_WHATSAPP);
-            return;
+          // Use local email; don't rely on state (async) for same-render transition
+          if (selectedSlot?.start && selectedSlot?.end && patientName && email) {
+            if (requirePolicyAgreement) {
+              setStateWithMessageAndSuggestions("POLICY_AGREEMENT", MSG_POLICY_AGREEMENT, [
+                { key: "confirm_booking", label: "Confirm booking", variant: "primary" },
+              ]);
+              setPolicyAgreed(false);
+            } else {
+              // No explicit agreement step required: confirm immediately
+              doConfirmBooking(new Date().toISOString());
+            }
           }
-        }
-        if (patientDetailsStep === "whatsapp") {
-          const phoneCheck = isValidChatPhone(trimmed.replace(/\s/g, ""));
-          if (!phoneCheck.valid) {
-            setMessage(phoneCheck.error ?? "Please enter a valid WhatsApp number.");
-            appendMessage("ai", phoneCheck.error ?? "Please enter a valid WhatsApp number.");
-            return;
-          }
-          setPatientWhatsApp(trimmed.replace(/\s/g, ""));
-        }
-        const shouldSubmit =
-          (patientDetailsStep === "email" && !isElitePlan) || patientDetailsStep === "whatsapp";
-        if (!shouldSubmit) return;
-        if (!selectedSlot?.start || !selectedSlot?.end || !patientName || !patientEmail) {
-          setMessage(MSG_NAME_EMAIL_CONTINUE);
-          appendMessage("ai", MSG_NAME_EMAIL_CONTINUE);
           return;
         }
-        const phoneForBooking =
-          patientDetailsStep === "whatsapp" ? trimmed.replace(/\s/g, "") : undefined;
-        try {
-          const res = await fetch(`${baseUrl}/api/embed/confirm-booking`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              clinicSlug,
-              sig,
-              patient_name: patientName,
-              patient_email: patientEmail,
-              patient_phone: phoneForBooking,
-              start_time: selectedSlot.start,
-              end_time: selectedSlot.end,
-            }),
-          });
-          const data = (await res.json()) as { ok?: boolean; error?: string };
-          if (data.ok) {
-            setCurrentState("BOOKING_SUCCESS");
-            const startStr = formatInClinicTz(selectedSlot.start, clinicInfo.timezone);
-            const msg = `You're booked for ${startStr}. Confirmation sent by email.`;
-            setMessage(msg);
-            const successChips: SuggestionItem[] = [
-              { key: "book_another", label: "Book another", variant: "primary" },
-              backChip,
-            ];
-            if (isProOrElite && selectedSlot?.start && selectedSlot?.end) {
-              const gcalUrl = buildGoogleCalendarUrl({
-                title: `Appointment at ${clinicInfo.name}`,
-                start: selectedSlot.start,
-                end: selectedSlot.end,
-                details: `${clinicInfo.name}${clinicInfo.address ? ` — ${clinicInfo.address}` : ""}`,
-                location: clinicInfo.address,
-              });
-              successChips.unshift({ key: "gcal", label: "Add to Google Calendar", value: gcalUrl });
-            }
-            setSuggestions(successChips);
-            appendMessage("ai", msg);
-            setIsInputDisabled(true);
-            setSelectedSlot(null);
-            setPatientName(null);
-            setPatientEmail(null);
-            setPatientWhatsApp(null);
-            setPatientDetailsStep("name");
-          } else {
-            const nextFail = bookingFailCount + 1;
-            setBookingFailCount(nextFail);
-            if (nextFail >= 3) {
-              setSelectedSlot(null);
-              setPatientName(null);
-              setPatientEmail(null);
-              setPatientWhatsApp(null);
-              setPatientDetailsStep("name");
-              setStateWithMessageAndSuggestions("GREETING", MSG_BOOKING_FAILED_LAST, [
-                { key: "book", label: "Book Appointment", variant: "primary" },
-                backChip,
-              ]);
-            } else {
-              const errMsg = data.error || MSG_BOOKING_FAILED;
-              setMessage(errMsg);
-              appendMessage("ai", errMsg);
-            }
-          }
-        } catch {
-          const nextFail = bookingFailCount + 1;
-          setBookingFailCount(nextFail);
-          if (nextFail >= 3) {
-            setSelectedSlot(null);
-            setPatientName(null);
-            setPatientEmail(null);
-            setPatientWhatsApp(null);
-            setPatientDetailsStep("name");
-            setStateWithMessageAndSuggestions("GREETING", MSG_BOOKING_FAILED_LAST, [
-              { key: "book", label: "Book Appointment", variant: "primary" },
-              backChip,
-            ]);
-          } else {
-            setMessage(MSG_BOOKING_FAILED);
-            appendMessage("ai", MSG_BOOKING_FAILED);
-          }
-        }
+        return;
+      }
+
+      if (currentState === "POLICY_AGREEMENT") {
         return;
       }
     },
@@ -524,6 +555,7 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
       patientDetailsStep,
       patientName,
       patientEmail,
+      patientPhone,
       selectedSlot,
       verifyAttemptCount,
       bookingFailCount,
@@ -533,10 +565,99 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
       isElitePlan,
       isProOrElite,
       clinicInfo,
+      requirePolicyAgreement,
       appendMessage,
       setStateWithMessageAndSuggestions,
     ]
   );
+
+  async function doConfirmBooking(policyAcceptedAt: string) {
+    if (!selectedSlot?.start || !selectedSlot?.end || !patientName || !patientEmail) return;
+    const phoneForBooking = patientPhone?.replace(/\s/g, "") || undefined;
+    try {
+      const res = await fetch(`${baseUrl}/api/embed/confirm-booking`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clinicSlug,
+          sig,
+          patient_name: patientName,
+          patient_email: patientEmail,
+          patient_phone: phoneForBooking,
+          start_time: selectedSlot.start,
+          end_time: selectedSlot.end,
+          policy_accepted_at: policyAcceptedAt,
+        }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (data.ok) {
+        setCurrentState("BOOKING_SUCCESS");
+        const startStr = formatInClinicTz(selectedSlot.start, clinicInfo.timezone);
+        const msg = `You're booked for ${startStr}. Confirmation sent by email.`;
+        setMessage(msg);
+        const successChips: SuggestionItem[] = [
+          { key: "book_another", label: "Book another", variant: "primary" },
+          backChip,
+        ];
+        if (isProOrElite && selectedSlot?.start && selectedSlot?.end) {
+          const gcalUrl = buildGoogleCalendarUrl({
+            title: `Appointment at ${clinicInfo.name}`,
+            start: selectedSlot.start,
+            end: selectedSlot.end,
+            details: `${clinicInfo.name}${clinicInfo.address ? ` — ${clinicInfo.address}` : ""}`,
+            location: clinicInfo.address,
+          });
+          successChips.unshift({ key: "gcal", label: "Add to Google Calendar", value: gcalUrl });
+        }
+        setSuggestions(successChips);
+        appendMessage("ai", msg);
+        setIsInputDisabled(true);
+        setSelectedSlot(null);
+        setPatientName(null);
+        setPatientEmail(null);
+        setPatientPhone(null);
+        setPatientDetailsStep("name");
+        setPolicyAgreed(false);
+      } else {
+        const nextFail = bookingFailCount + 1;
+        setBookingFailCount(nextFail);
+        if (nextFail >= 3) {
+          setSelectedSlot(null);
+          setPatientName(null);
+          setPatientEmail(null);
+          setPatientPhone(null);
+          setPatientDetailsStep("name");
+          setIsInputDisabled(true);
+          setStateWithMessageAndSuggestions("GREETING", MSG_BOOKING_FAILED_LAST, [
+            { key: "book", label: "Book Appointment", variant: "primary" },
+            backChip,
+          ]);
+        } else {
+          const errMsg = data.error || MSG_BOOKING_FAILED;
+          setMessage(errMsg);
+          appendMessage("ai", errMsg);
+        }
+      }
+    } catch {
+      const nextFail = bookingFailCount + 1;
+      setBookingFailCount(nextFail);
+      if (nextFail >= 3) {
+        setSelectedSlot(null);
+        setPatientName(null);
+        setPatientEmail(null);
+        setPatientPhone(null);
+        setPatientDetailsStep("name");
+        setIsInputDisabled(true);
+        setStateWithMessageAndSuggestions("GREETING", MSG_BOOKING_FAILED_LAST, [
+          { key: "book", label: "Book Appointment", variant: "primary" },
+          backChip,
+        ]);
+      } else {
+        setMessage(MSG_BOOKING_FAILED);
+        appendMessage("ai", MSG_BOOKING_FAILED);
+      }
+    }
+  }
 
   // MANAGE_BOOKING: Reschedule / Cancel
   const handleManageBookingAction = useCallback(
@@ -618,6 +739,44 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
         window.open(value, "_blank");
         return;
       }
+      if (currentState === "POLICY_AGREEMENT" && key === "confirm_booking") {
+        appendMessage("user", label);
+        if (requirePolicyAgreement && !policyAgreed) {
+          setMessage(MSG_POLICY_CHECK_REQUIRED);
+          appendMessage("ai", MSG_POLICY_CHECK_REQUIRED);
+          return;
+        }
+        doConfirmBooking(new Date().toISOString());
+        return;
+      }
+      if (currentState === "VERIFY_ACCOUNT" && verifyAttemptCount >= 3 && (key === "book" || key === "back")) {
+        appendMessage("user", label);
+        setIsInputDisabled(true);
+        if (key === "book") {
+          setVerifyAttemptCount(0);
+          setBookingFailCount(0);
+          setStateWithMessageAndSuggestions("BOOKING_REASON", MSG_BOOKING_REASON, bookingReasonSuggestions);
+        } else {
+          setCurrentState("GREETING");
+          setMessage(GREETING_MSG);
+          setSuggestions(lockedSuggestions);
+          appendMessage("ai", GREETING_MSG);
+        }
+        return;
+      }
+      if (currentState === "GREETING" && bookingFailCount >= 3 && (key === "book" || key === "back")) {
+        appendMessage("user", label);
+        setIsInputDisabled(true);
+        if (key === "book") {
+          setBookingFailCount(0);
+          setStateWithMessageAndSuggestions("BOOKING_REASON", MSG_BOOKING_REASON, bookingReasonSuggestions);
+        } else {
+          setMessage(GREETING_MSG);
+          setSuggestions(lockedSuggestions);
+          appendMessage("ai", GREETING_MSG);
+        }
+        return;
+      }
       if (currentState === "BOOKING_SUCCESS" || currentState === "CANCEL_SUCCESS") {
         if (key === "book_another" || key === "back" || key === "book") {
           appendMessage("user", label);
@@ -625,6 +784,7 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
           setMessage(GREETING_MSG);
           setSuggestions(greetingSuggestions);
           appendMessage("ai", GREETING_MSG);
+          setIsInputDisabled(true);
         }
         return;
       }
@@ -633,7 +793,7 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
           appendMessage("user", label);
           setCurrentState("BOOKING_DATE");
           setMessage("When would you like to come? Pick a day.");
-          setSuggestions([]);
+          setStateOnlySuggestions("BOOKING_DATE", [backChip]);
           appendMessage("ai", "When would you like to come? Pick a day.");
           fetchWorkingDays().then((dateChips) => {
             setStateOnlySuggestions("BOOKING_DATE", [...dateChips, backChip]);
@@ -647,9 +807,13 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
           return;
         }
       }
+      if (currentState === "BOOKING_PERIOD" && (key === "back" || key === "Morning" || key === "Afternoon" || key === "Evening")) {
+        onChipSelect(key, label, value);
+        return;
+      }
       if (currentState === "BOOKING_DATE" && key === "back") {
         appendMessage("user", label);
-        setStateWithMessageAndSuggestions("BOOKING_REASON", MSG_BOOKING_REASON, FIXED_SERVICES);
+        setStateWithMessageAndSuggestions("BOOKING_REASON", MSG_BOOKING_REASON, bookingReasonSuggestions);
         return;
       }
       if (currentState === "BOOKING_DATE" && /^\d{4}-\d{2}-\d{2}$/.test(key)) {
@@ -658,20 +822,29 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
       }
       if (currentState === "BOOKING_TIME" && key === "back") {
         appendMessage("user", label);
-        setSelectedDate(null);
         setSlotSuggestions([]);
-        setCurrentState("BOOKING_DATE");
-        setMessage("When would you like to come? Pick a day.");
-        appendMessage("ai", "When would you like to come? Pick a day.");
-        fetchWorkingDays().then((dateChips) => {
-          setStateOnlySuggestions("BOOKING_DATE", [...dateChips, backChip]);
-          setSuggestions([...dateChips, backChip]);
-        });
+        if (allSlotsForDate.length > 0) {
+          setCurrentState("BOOKING_PERIOD");
+          setMessage(MSG_CHOOSE_PERIOD);
+          setSuggestions(periodSuggestions);
+          appendMessage("ai", MSG_CHOOSE_PERIOD);
+        } else {
+          setSelectedDate(null);
+          setCurrentState("BOOKING_DATE");
+          setMessage("When would you like to come? Pick a day.");
+          setStateOnlySuggestions("BOOKING_DATE", [backChip]);
+          appendMessage("ai", "When would you like to come? Pick a day.");
+          fetchWorkingDays().then((dateChips) => {
+            setStateOnlySuggestions("BOOKING_DATE", [...dateChips, backChip]);
+            setSuggestions([...dateChips, backChip]);
+          });
+        }
         return;
       }
       if (currentState === "BOOKING_TIME" && verifiedAppointments.length > 0 && value) {
         appendMessage("user", label);
-        const endIso = new Date(new Date(value).getTime() + 30 * 60 * 1000).toISOString();
+        const durationMs = selectedServiceDuration * 60 * 1000;
+        const endIso = new Date(new Date(value).getTime() + durationMs).toISOString();
         handleManageBookingAction("reschedule", value, endIso);
         setSlotSuggestions([]);
         setSelectedDate(null);
@@ -679,19 +852,69 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
       }
       onChipSelect(key, label, value);
     },
-    [currentState, verifiedAppointments.length, onChipSelect, handleManageBookingAction, appendMessage, fetchWorkingDays, setStateOnlySuggestions]
+    [
+      currentState,
+      requirePolicyAgreement,
+      policyAgreed,
+      doConfirmBooking,
+      verifyAttemptCount,
+      bookingFailCount,
+      verifiedAppointments.length,
+      allSlotsForDate.length,
+      periodSuggestions,
+      selectedServiceDuration,
+      onChipSelect,
+      handleManageBookingAction,
+      appendMessage,
+      fetchWorkingDays,
+      setStateOnlySuggestions,
+      setStateWithMessageAndSuggestions,
+      bookingReasonSuggestions,
+      lockedSuggestions,
+    ]
   );
+
+  const verifyLocked = currentState === "VERIFY_ACCOUNT" && verifyAttemptCount >= 3;
+  const bookingLocked = currentState === "GREETING" && bookingFailCount >= 3;
+  const effectiveInputDisabled =
+    currentState === "PATIENT_DETAILS"
+      ? false
+      : currentState === "POLICY_AGREEMENT"
+        ? true
+        : isInputDisabled || verifyLocked || bookingLocked;
+  const inputPlaceholder =
+    currentState === "PATIENT_DETAILS"
+      ? patientDetailsStep === "name"
+        ? "Enter your full name"
+        : "Enter your email"
+      : undefined;
+
+  const effectiveSuggestions =
+    currentState === "BOOKING_TIME"
+      ? slotSuggestions
+      : currentState === "BOOKING_PERIOD"
+        ? periodSuggestions.length > 0
+          ? periodSuggestions
+          : suggestions
+        : verifyLocked || bookingLocked
+          ? lockedSuggestions
+          : displaySuggestions;
 
   return {
     messages,
     message,
-    suggestions: currentState === "BOOKING_TIME" ? slotSuggestions : displaySuggestions,
-    isInputDisabled,
+    suggestions: effectiveSuggestions,
+    isInputDisabled: effectiveInputDisabled,
+    inputPlaceholder,
     isLoadingSlots,
     currentState,
     onChipSelect: effectiveOnChipSelect,
     onSend,
     clinicInfo,
     isRescheduleFlow: verifiedAppointments.length > 0,
+    showPolicyAgreement: currentState === "POLICY_AGREEMENT" && requirePolicyAgreement,
+    policyAgreed,
+    setPolicyAgreed,
+    cancellationPolicyText: clinicInfo.cancellation_policy_text ?? null,
   };
 }

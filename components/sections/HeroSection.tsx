@@ -5,6 +5,10 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { ChatDemo } from "@/components/sections/ChatDemo";
 
+const HERO_CHAT_EXAMPLES = [
+  { label: "Book a cleaning", example: "I'd like to book a cleaning" },
+];
+
 export function HeroSection() {
   return (
     <section className="relative overflow-hidden bg-gradient-to-b from-primary/5 via-slate-50 to-white px-4 pt-16 pb-12 sm:px-6 sm:pt-24 sm:pb-16 md:pt-28 md:pb-20 lg:px-8 lg:pt-36 lg:pb-28">
@@ -62,17 +66,42 @@ export function HeroSection() {
               See Live Demo
             </Button>
           </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.35 }}
+            className="mt-6 flex flex-wrap items-center gap-2"
+          >
+            <span className="text-xs text-slate-500">Try in demo:</span>
+            {HERO_CHAT_EXAMPLES.map(({ label, example }) => (
+              <Link
+                key={example}
+                href={`/?example=${encodeURIComponent(example)}#demo`}
+                className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+              >
+                {label}
+              </Link>
+            ))}
+          </motion.div>
         </div>
 
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.4 }}
-          className="relative flex justify-center lg:justify-end"
+          className="relative flex flex-col items-center gap-4 lg:items-end"
         >
-          <div className="animate-float">
-            <ChatDemo />
-          </div>
+          <button
+            type="button"
+            onClick={() => document.getElementById("demo")?.scrollIntoView({ behavior: "smooth" })}
+            className="w-full max-w-sm cursor-pointer text-left"
+            aria-label="Scroll to live chat demo"
+          >
+            <div className="animate-float">
+              <ChatDemo />
+            </div>
+          </button>
+          <p className="text-center text-xs text-slate-500 lg:text-right">Click to try the live chat below</p>
         </motion.div>
       </div>
     </section>

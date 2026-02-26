@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireAdmin } from "@/lib/admin-auth-server";
 
 const PAGE_SIZE = 20;
 
@@ -48,25 +48,42 @@ export async function GET(request: Request) {
 
   const { data: members } = await admin
     .from("clinic_members")
-    .select("clinic_id, user_id, role")
+    .select("clinic_id, app_user_id, role")
     .eq("role", "owner")
     .in("clinic_id", clinicIds);
 
-  const ownerIds = (members || []).map((m) => (m as { user_id: string }).user_id);
+  const appUserIds = Array.from(
+    new Set(
+      (members || [])
+        .map((m) => (m as { app_user_id: string | null }).app_user_id)
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+
   const emailMap: Record<string, string> = {};
-  for (const uid of ownerIds) {
-    try {
-      const { data: { user } } = await admin.auth.admin.getUserById(uid);
-      if (user?.email) emailMap[uid] = user.email;
-    } catch {
-      emailMap[uid] = "";
+  if (appUserIds.length > 0) {
+    const { data: appUsers, error: appUsersError } = await admin
+      .from("app_users")
+      .select("id, email")
+      .in("id", appUserIds);
+
+    if (appUsersError) {
+      console.error("admin billing app_users lookup", appUsersError);
+    } else {
+      for (const u of appUsers || []) {
+        const row = u as { id: string; email: string | null };
+        if (row.email) {
+          emailMap[row.id] = row.email;
+        }
+      }
     }
   }
 
   const ownerByClinic: Record<string, string> = {};
   for (const m of members || []) {
-    const row = m as { clinic_id: string; user_id: string };
-    ownerByClinic[row.clinic_id] = emailMap[row.user_id] ?? "";
+    const row = m as { clinic_id: string; app_user_id: string | null };
+    const email = row.app_user_id ? emailMap[row.app_user_id] ?? "" : "";
+    ownerByClinic[row.clinic_id] = email;
   }
 
   const result = list.map((c) => {

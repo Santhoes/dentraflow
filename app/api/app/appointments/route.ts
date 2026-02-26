@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { requireUser } from "@/lib/auth/app-auth";
 import { sendResendEmail } from "@/lib/resend";
-import { sendWhatsApp } from "@/lib/whatsapp";
-import { hasPlanFeature } from "@/lib/plan-features";
 import { renderEmailHtml, escapeHtml } from "@/lib/email-template";
 import { buildGoogleCalendarUrl } from "@/lib/google-calendar-url";
 
@@ -13,18 +11,11 @@ import { buildGoogleCalendarUrl } from "@/lib/google-calendar-url";
  * Sends confirmation email to patient (if email) and notifies clinic team.
  */
 export async function POST(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  const token = authHeader?.replace("Bearer ", "").trim();
-  if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) return NextResponse.json({ error: "Server config" }, { status: 500 });
-
-  const supabase = createClient(url, anonKey);
-  const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-  if (userError || !user) {
-    return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+  let auth;
+  try {
+    auth = await requireUser();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   let body: {
@@ -52,7 +43,7 @@ export async function POST(request: Request) {
   const { data: member } = await admin
     .from("clinic_members")
     .select("clinic_id")
-    .eq("user_id", user.id)
+    .eq("app_user_id", auth.user.id)
     .limit(1)
     .maybeSingle();
   if (!member?.clinic_id) {
@@ -142,11 +133,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: apptErr?.message || "Failed to create appointment" }, { status: 500 });
   }
 
-  const { data: clinic } = await admin.from("clinics").select("name, plan, whatsapp_phone, phone").eq("id", clinicId).single();
+  const { data: clinic } = await admin.from("clinics").select("name, plan").eq("id", clinicId).single();
   const clinicName = (clinic as { name: string } | null)?.name || "Clinic";
   const clinicPlan = (clinic as { plan?: string } | null)?.plan;
-  const c = clinic as { whatsapp_phone?: string | null; phone?: string | null } | null;
-  const clinicPhone = c?.whatsapp_phone?.trim() || c?.phone?.trim();
   const startDate = new Date(startTime).toLocaleString(undefined, { dateStyle: "long", timeStyle: "short" });
   const endDate = new Date(endTime).toLocaleString(undefined, { timeStyle: "short" });
   const isProOrElite = clinicPlan === "pro" || clinicPlan === "elite";
@@ -173,15 +162,12 @@ export async function POST(request: Request) {
     });
   }
 
-  const { data: members } = await admin.from("clinic_members").select("user_id").eq("clinic_id", clinicId);
+  const { data: members } = await admin.from("clinic_members").select("app_user_id").eq("clinic_id", clinicId);
+  const appUserIds = (members || []).map((m) => (m as { app_user_id: string | null }).app_user_id).filter(Boolean) as string[];
   const emails: string[] = [];
-  for (const m of members || []) {
-    try {
-      const { data: { user: u } } = await admin.auth.admin.getUserById((m as { user_id: string }).user_id);
-      if (u?.email) emails.push(u.email);
-    } catch {
-      // skip
-    }
+  if (appUserIds.length > 0) {
+    const { data: users } = await admin.from("app_users").select("email").in("id", appUserIds);
+    for (const u of users ?? []) emails.push((u as { email: string }).email);
   }
   if (emails.length > 0) {
     await sendResendEmail({
@@ -197,15 +183,6 @@ export async function POST(request: Request) {
     });
   }
 
-  if (hasPlanFeature(clinicPlan, "whatsApp") && clinicPhone && clinicPhone.replace(/\D/g, "").length >= 10) {
-    const staffMsg = `New appointment at ${clinicName}: ${patientName || "Patient"} — ${startDate} – ${endDate}.`;
-    sendWhatsApp({ to: clinicPhone, body: staffMsg }).catch((e) => console.error("WhatsApp to clinic:", e));
-    if (patientPhone && patientPhone.replace(/\D/g, "").length >= 10) {
-      const patientMsg = `Hi${patientName ? ` ${patientName}` : ""}, your appointment at ${clinicName} is confirmed for ${startDate} – ${endDate}. Reply if you need to change or cancel.`;
-      sendWhatsApp({ to: patientPhone, body: patientMsg }).catch((e) => console.error("WhatsApp to patient:", e));
-    }
-  }
-
   return NextResponse.json({ ok: true, appointment_id: (appointment as { id: string }).id });
 }
 
@@ -214,23 +191,18 @@ export async function POST(request: Request) {
  * No body. Updates scheduled/confirmed appointments with end_time < now() to status 'completed'.
  */
 export async function PATCH(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  const token = authHeader?.replace("Bearer ", "").trim();
-  if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) return NextResponse.json({ error: "Server config" }, { status: 500 });
-
-  const supabase = createClient(url, anonKey);
-  const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-  if (userError || !user) return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+  let auth;
+  try {
+    auth = await requireUser();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const admin = createAdminClient();
   const { data: member } = await admin
     .from("clinic_members")
     .select("clinic_id")
-    .eq("user_id", user.id)
+    .eq("app_user_id", auth.user.id)
     .limit(1)
     .maybeSingle();
   if (!member?.clinic_id) return NextResponse.json({ error: "No clinic" }, { status: 403 });

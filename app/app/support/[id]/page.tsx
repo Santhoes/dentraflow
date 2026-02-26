@@ -4,13 +4,13 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useApp } from "@/lib/app-context";
-import { createClient } from "@/lib/supabase/client";
 import { ArrowLeft, Loader2, Pencil, Trash2, Send } from "lucide-react";
 
 interface SupportCase {
   id: string;
   clinic_id: string;
-  user_id: string;
+  user_id?: string;
+  app_user_id?: string;
   subject: string;
   body: string;
   created_at: string;
@@ -49,19 +49,20 @@ export default function SupportCaseDetailPage() {
     setLoading(true);
     setError(null);
     try {
-      const supabase = createClient();
-      const { data, error: e } = await supabase
-        .from("support_messages")
-        .select("id, clinic_id, user_id, subject, body, created_at, admin_reply, admin_replied_at, status")
-        .eq("id", id)
-        .single();
-      if (e) {
-        setError(e.message || "Case not found");
+      const res = await fetch(`/api/app/support/${id}`, { credentials: "include" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError((data as { error?: string }).error || "Case not found");
         setCaseData(null);
-      } else if (data) {
-        setCaseData(data as SupportCase);
-        setEditSubject((data as SupportCase).subject || "");
-        setEditBody((data as SupportCase).body || "");
+      } else {
+        const c = (data as { case?: SupportCase }).case;
+        const r = (data as { replies?: SupportReply[] }).replies;
+        if (c) {
+          setCaseData(c);
+          setEditSubject(c.subject || "");
+          setEditBody(c.body || "");
+        }
+        if (Array.isArray(r)) setReplies(r);
       }
     } finally {
       setLoading(false);
@@ -70,13 +71,10 @@ export default function SupportCaseDetailPage() {
 
   const fetchReplies = useCallback(async () => {
     if (!id) return;
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from("support_replies")
-      .select("id, case_id, from_role, body, created_at")
-      .eq("case_id", id)
-      .order("created_at", { ascending: true });
-    if (!error) setReplies((data as SupportReply[]) ?? []);
+    const res = await fetch(`/api/app/support/${id}`, { credentials: "include" });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && Array.isArray((data as { replies?: SupportReply[] }).replies))
+      setReplies((data as { replies: SupportReply[] }).replies);
   }, [id]);
 
   useEffect(() => {
@@ -87,24 +85,21 @@ export default function SupportCaseDetailPage() {
     if (id && caseData) fetchReplies();
   }, [id, caseData, fetchReplies]);
 
-  const canEditDelete = caseData && user && caseData.user_id === user.id && caseData.admin_reply == null;
+  const canEditDelete =
+    caseData &&
+    user &&
+    ((caseData as { app_user_id?: string }).app_user_id === user.id || caseData.user_id === user.id) &&
+    caseData.admin_reply == null;
 
   const handleSendReply = async () => {
     if (!id || !replyText.trim()) return;
     setSendingReply(true);
     setError(null);
     try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) {
-        setError("Please sign in again.");
-        setSendingReply(false);
-        return;
-      }
       const res = await fetch(`/api/app/support/${id}/reply`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: replyText.trim() }),
       });
       const data = await res.json().catch(() => ({}));
@@ -126,17 +121,10 @@ export default function SupportCaseDetailPage() {
     if (!id || !caseData) return;
     setSaving(true);
     try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) {
-        setError("Please sign in again.");
-        setSaving(false);
-        return;
-      }
       const res = await fetch(`/api/app/support/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ subject: editSubject.trim() || undefined, message: editBody.trim() }),
       });
       const data = await res.json().catch(() => ({}));
@@ -158,17 +146,9 @@ export default function SupportCaseDetailPage() {
     if (!confirm("Delete this case? This cannot be undone.")) return;
     setDeleting(true);
     try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) {
-        setError("Please sign in again.");
-        setDeleting(false);
-        return;
-      }
       const res = await fetch(`/api/app/support/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {

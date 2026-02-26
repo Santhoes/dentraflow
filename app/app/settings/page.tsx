@@ -4,9 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useApp } from "@/lib/app-context";
-import { createClient } from "@/lib/supabase/client";
-import { Loader2, Zap, Crown, Lock } from "lucide-react";
-import { hasPlanFeature, normalizePlan } from "@/lib/plan-features";
+import { Loader2, Zap, Crown, Lock, Plus, Trash2, CreditCard, FileText } from "lucide-react";
+import { hasPlanFeature, normalizePlan, planAtLeast } from "@/lib/plan-features";
 import { PLANS } from "@/lib/supabase/types";
 
 const DEMO_PRESETS = [
@@ -27,6 +26,31 @@ export default function AppSettingsPage() {
   const [savingBranding, setSavingBranding] = useState(false);
   const [demoIndex, setDemoIndex] = useState(0);
   const initializedForClinicId = useRef<string | null>(null);
+
+  const [services, setServices] = useState<{ id: string; name: string; duration_minutes: number; enabled: boolean }[]>([]);
+  const [lastSavedServices, setLastSavedServices] = useState<{ id: string; name: string; duration_minutes: number; enabled: boolean }[]>([]);
+  const [loadingServices, setLoadingServices] = useState(false);
+  const [savingServices, setSavingServices] = useState(false);
+
+  const [cancellationPolicy, setCancellationPolicy] = useState("");
+  const [paypalMerchantId, setPaypalMerchantId] = useState("");
+  const [depositRequired, setDepositRequired] = useState(false);
+  const [requirePolicyAgreement, setRequirePolicyAgreement] = useState(true);
+  const [defaultDepositAmount, setDefaultDepositAmount] = useState("");
+  const [depositCurrency, setDepositCurrency] = useState("USD");
+  const [savingPayments, setSavingPayments] = useState(false);
+
+  const servicesUnchanged =
+    services.length === lastSavedServices.length &&
+    services.every(
+      (s, i) =>
+        lastSavedServices[i] &&
+        lastSavedServices[i].id === s.id &&
+        lastSavedServices[i].name === s.name &&
+        lastSavedServices[i].duration_minutes === s.duration_minutes &&
+        lastSavedServices[i].enabled === s.enabled
+    );
+
   useEffect(() => {
     if (!hasPlanFeature(clinic?.plan ?? null, "customBranding")) {
       const t = setInterval(() => {
@@ -45,23 +69,135 @@ export default function AppSettingsPage() {
     setWidgetBackgroundColor((clinic as { widget_background_color?: string | null }).widget_background_color ?? "");
   }, [clinic?.id, (clinic as { logo_url?: string | null })?.logo_url, (clinic as { widget_primary_color?: string | null })?.widget_primary_color, (clinic as { widget_background_color?: string | null })?.widget_background_color]);
 
+  useEffect(() => {
+    if (!clinic?.id) return;
+    setCancellationPolicy((clinic as { cancellation_policy_text?: string | null }).cancellation_policy_text ?? "");
+    setPaypalMerchantId((clinic as { paypal_merchant_id?: string | null }).paypal_merchant_id ?? "");
+    setDepositRequired((clinic as { deposit_required?: boolean }).deposit_required === true);
+    setRequirePolicyAgreement((clinic as { require_policy_agreement?: boolean }).require_policy_agreement !== false);
+    const rules = (clinic as { deposit_rules_json?: { default_amount?: number; currency?: string } | null }).deposit_rules_json;
+    if (rules?.default_amount != null) setDefaultDepositAmount(String(rules.default_amount));
+    else setDefaultDepositAmount("");
+    if (rules?.currency) setDepositCurrency(rules.currency);
+    else setDepositCurrency("USD");
+  }, [clinic?.id, (clinic as { cancellation_policy_text?: string | null })?.cancellation_policy_text, (clinic as { paypal_merchant_id?: string | null })?.paypal_merchant_id, (clinic as { deposit_required?: boolean })?.deposit_required, (clinic as { require_policy_agreement?: boolean })?.require_policy_agreement, (clinic as { deposit_rules_json?: unknown })?.deposit_rules_json]);
+
+  useEffect(() => {
+    if (!clinic?.id) return;
+    let cancelled = false;
+    setLoadingServices(true);
+    (async () => {
+      try {
+        const res = await fetch("/api/app/clinic/services", { credentials: "include" });
+        if (cancelled || !res.ok) return;
+        const data = await res.json().catch(() => ({}));
+        const raw = (data as { services?: { id: string; name: string; duration_minutes: number; enabled?: boolean }[] }).services;
+        const list = Array.isArray(raw)
+          ? raw.map((s) => ({ ...s, enabled: s.enabled !== false }))
+          : [];
+        setServices(list);
+        setLastSavedServices(list);
+      } finally {
+        if (!cancelled) setLoadingServices(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [clinic?.id]);
+
+  const handleSaveServices = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingServices(true);
+    setMessage(null);
+    try {
+      const payload = services.filter((s) => s.name.trim().length > 0 && s.duration_minutes >= 15 && s.duration_minutes <= 480);
+      const res = await fetch("/api/app/clinic/services", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          services: payload.map((s) => ({
+            id: s.id || undefined,
+            name: s.name.trim(),
+            duration_minutes: s.duration_minutes,
+            enabled: s.enabled !== false,
+          })),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMessage({ type: "err", text: (data.error as string) || "Failed to save." });
+        setSavingServices(false);
+        return;
+      }
+      const raw = (data as { services?: { id: string; name: string; duration_minutes: number; enabled?: boolean }[] }).services;
+      const list = Array.isArray(raw) ? raw.map((s) => ({ ...s, enabled: s.enabled !== false })) : [];
+      setServices(list);
+      setLastSavedServices(list);
+      setMessage({ type: "ok", text: "Appointment types saved. They appear as suggestions in the chat and set slot length." });
+    } catch {
+      setMessage({ type: "err", text: "Failed to save." });
+    }
+    setSavingServices(false);
+  };
+
+  const handleSavePaymentsAndPolicy = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clinic) return;
+    setSavingPayments(true);
+    setMessage(null);
+    try {
+      const policy = cancellationPolicy.trim().slice(0, 15000);
+      const body: Record<string, unknown> = {
+        cancellation_policy_text: policy || null,
+      };
+      if (planAtLeast(plan, "elite")) {
+        body.paypal_merchant_id = paypalMerchantId.trim() || null;
+        body.deposit_required = depositRequired;
+        body.require_policy_agreement = requirePolicyAgreement;
+        if (!depositRequired) {
+          body.deposit_rules_json = null;
+        } else {
+          const amount = defaultDepositAmount.trim() ? parseFloat(defaultDepositAmount) : null;
+          if (amount != null && !Number.isNaN(amount) && amount >= 0) {
+            body.deposit_rules_json = {
+              default_amount: Math.round(amount * 100) / 100,
+              currency: depositCurrency,
+            };
+          } else {
+            body.deposit_rules_json = null;
+          }
+        }
+      }
+      const res = await fetch("/api/app/clinic", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMessage({ type: "err", text: (data.error as string) || "Failed to save." });
+        setSavingPayments(false);
+        return;
+      }
+      setMessage({ type: "ok", text: "Payments and policy saved." });
+      refetchClinic();
+    } catch {
+      setMessage({ type: "err", text: "Failed to save." });
+    }
+    setSavingPayments(false);
+  };
+
   const handleSaveBranding = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!clinic) return;
     setSavingBranding(true);
     setMessage(null);
     try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) {
-        setMessage({ type: "err", text: "Please sign in again." });
-        setSavingBranding(false);
-        return;
-      }
       const res = await fetch("/api/app/clinic", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           logo_url: logoUrl.trim() || null,
           widget_primary_color: widgetPrimaryColor.trim() || null,
@@ -101,23 +237,23 @@ export default function AppSettingsPage() {
           <p className="mt-1 text-slate-600">
             {hasCustomBranding
               ? "Manage chat widget branding and plan. Your plan: " + (planInfo?.name ?? plan) + "."
-              : "Your plan: " + (planInfo?.name ?? plan) + ". Upgrade to Elite to customize the chat widget on your site."}
+              : "Your plan: " + (planInfo?.name ?? plan) + ". Upgrade to Elite or Smart Booking Site to customize the chat widget on your site."}
           </p>
           <p className="mt-1 text-sm text-slate-500">
             <Link href="/app/settings/details" className="font-medium text-primary hover:underline">Clinic details</Link>
-            {" "}(name, phone, WhatsApp) — use a number with WhatsApp for better patient contact.
+            {" "}(name, phone) for patient contact. Payments & policy (cancellation, PayPal, deposit) below.
           </p>
         </div>
         <span
           className={
-            plan === "elite"
+            planAtLeast(plan, "elite")
               ? "inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1.5 text-sm font-medium text-amber-800"
               : plan === "pro"
                 ? "inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary"
                 : "inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-700"
           }
         >
-          {plan === "elite" ? <Crown className="h-4 w-4" /> : plan === "pro" ? <Zap className="h-4 w-4" /> : null}
+          {planAtLeast(plan, "elite") ? <Crown className="h-4 w-4" /> : plan === "pro" ? <Zap className="h-4 w-4" /> : null}
           {planInfo?.name ?? plan} plan
         </span>
       </div>
@@ -131,6 +267,233 @@ export default function AppSettingsPage() {
           {message.text}
         </div>
       )}
+
+      {/* Payments & policies: cancellation policy for all; PayPal + deposit for Elite only */}
+      <section>
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Payments & policies</h2>
+        <div className={`rounded-xl border p-6 shadow-sm ${planAtLeast(plan, "elite") ? "border-amber-200 bg-amber-50/30" : "border-slate-200 bg-slate-50/30"}`}>
+          <p className="text-sm font-medium text-slate-900">Cancellation policy and deposit (Elite / Smart Booking Site)</p>
+          <p className="mt-0.5 text-sm text-slate-600">
+            Set the cancellation and refund policy text that patients see before paying a deposit. Elite and Smart Booking Site plans can link a PayPal Business account and require a deposit to confirm bookings.
+          </p>
+          <form onSubmit={handleSavePaymentsAndPolicy} className="mt-4 space-y-4">
+            <div>
+              <label htmlFor="cancellation-policy" className="block text-sm font-medium text-slate-700">
+                <FileText className="inline h-4 w-4 mr-1.5 -mt-0.5" />
+                Cancellation & refund policy
+              </label>
+              <p className="mt-0.5 text-xs text-slate-500">Shown to patients before they pay a deposit. Include your cancellation and refund rules.</p>
+              <textarea
+                id="cancellation-policy"
+                value={cancellationPolicy}
+                onChange={(e) => setCancellationPolicy(e.target.value)}
+                rows={4}
+                placeholder="e.g. Cancellations with more than 24 hours notice receive a full refund. No-shows forfeit the deposit."
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
+                maxLength={15001}
+              />
+              <p className="mt-0.5 text-xs text-slate-500">{cancellationPolicy.length} / 15000 characters</p>
+            </div>
+
+            {planAtLeast(plan, "elite") ? (
+              <>
+                <div>
+                  <label htmlFor="paypal-merchant-id" className="block text-sm font-medium text-slate-700">
+                    <CreditCard className="inline h-4 w-4 mr-1.5 -mt-0.5" />
+                    PayPal Business Merchant ID
+                  </label>
+                  <p className="mt-0.5 text-xs text-slate-500">Your PayPal Business account merchant ID. Deposit payments go directly to this account. Find it in your PayPal Business profile or developer dashboard.</p>
+                  <input
+                    id="paypal-merchant-id"
+                    type="text"
+                    value={paypalMerchantId}
+                    onChange={(e) => setPaypalMerchantId(e.target.value.replace(/[^A-Za-z0-9_-]/g, ""))}
+                    placeholder="e.g. ABC123XYZ"
+                    maxLength={64}
+                    className="mt-1 w-full max-w-md rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-mono"
+                  />
+                </div>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="deposit-required"
+                    checked={depositRequired}
+                    onChange={(e) => setDepositRequired(e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                  />
+                  <label htmlFor="deposit-required" className="text-sm font-medium text-slate-700">
+                    Require deposit to confirm booking
+                  </label>
+                </div>
+                {depositRequired && (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        id="require-policy-agreement"
+                        checked={requirePolicyAgreement}
+                        onChange={(e) => setRequirePolicyAgreement(e.target.checked)}
+                        className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                      />
+                      <label htmlFor="require-policy-agreement" className="text-sm font-medium text-slate-700">
+                        Require patients to agree to cancellation policy before confirming
+                      </label>
+                    </div>
+                    <div className="flex flex-wrap items-end gap-4 rounded-lg border border-slate-200 bg-white p-4">
+                    <div>
+                      <label htmlFor="default-deposit-amount" className="block text-sm font-medium text-slate-700">Default deposit amount</label>
+                      <input
+                        id="default-deposit-amount"
+                        type="number"
+                        min={0}
+                        max={100000}
+                        step={0.01}
+                        value={defaultDepositAmount}
+                        onChange={(e) => setDefaultDepositAmount(e.target.value)}
+                        placeholder="25"
+                        className="mt-1 w-32 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="deposit-currency" className="block text-sm font-medium text-slate-700">Currency</label>
+                      <select
+                        id="deposit-currency"
+                        value={depositCurrency}
+                        onChange={(e) => setDepositCurrency(e.target.value)}
+                        className="mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900"
+                      >
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
+                        <option value="GBP">GBP</option>
+                        <option value="CAD">CAD</option>
+                        <option value="AUD">AUD</option>
+                      </select>
+                    </div>
+                    </div>
+                  </>
+                )}
+              </>
+            ) : (
+              <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <Lock className="h-4 w-4 text-slate-400 shrink-0" />
+                <p className="text-sm text-slate-600">
+                  PayPal linking and deposit requirements are available on the Elite or Smart Booking Site plan. Upgrade to accept deposits and receive payments directly to your PayPal Business account.
+                </p>
+                <Link href="/app/plan" className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary/90">Upgrade to Elite or Smart Booking Site</Link>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={savingPayments}
+              className="min-h-[44px] rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50 touch-manipulation sm:py-2"
+            >
+              {savingPayments ? <Loader2 className="inline h-4 w-4 animate-spin" /> : null} Save payments & policy
+            </button>
+          </form>
+        </div>
+      </section>
+
+      {/* Appointment types first: enable/disable or edit; no list until clinic adds or migration seeds */}
+      <section>
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Appointment types</h2>
+        <div className="rounded-xl border border-slate-200 bg-slate-50/30 p-6 shadow-sm">
+          <p className="text-sm font-medium text-slate-900">Service names and durations</p>
+          <p className="mt-0.5 text-sm text-slate-600">
+            Add or edit appointment types. These appear as suggestion chips when patients book (e.g. Preventive, Restorative). Duration sets the length of each time slot. Enable or disable services your clinic offers.
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            Time slots in the chat use your clinic&apos;s working hours. Set them in <Link href="/app/locations" className="font-medium text-primary hover:underline">App → Locations</Link> (per location).
+          </p>
+          {loadingServices ? (
+            <div className="mt-4 flex items-center gap-2 text-sm text-slate-500">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+            </div>
+          ) : (
+            <form onSubmit={handleSaveServices} className="mt-4">
+              <div className="space-y-3">
+                {services.map((s, i) => (
+                  <div
+                    key={s.id || `new-${i}`}
+                    className={`flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 ${
+                      s.enabled ? "border-slate-200 bg-white" : "border-slate-200 bg-slate-100"
+                    }`}
+                  >
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={s.enabled}
+                        onChange={(e) =>
+                          setServices((prev) => {
+                            const next = [...prev];
+                            next[i] = { ...next[i], enabled: e.target.checked };
+                            return next;
+                          })
+                        }
+                        className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                      />
+                      <span className="text-sm font-medium text-slate-700">Show in chat</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={s.name}
+                      onChange={(e) =>
+                        setServices((prev) => {
+                          const next = [...prev];
+                          next[i] = { ...next[i], name: e.target.value };
+                          return next;
+                        })
+                      }
+                      placeholder="e.g. Preventive"
+                      className="min-h-[44px] w-40 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 touch-manipulation sm:w-48"
+                    />
+                    <input
+                      type="number"
+                      min={15}
+                      max={480}
+                      value={s.duration_minutes}
+                      onChange={(e) =>
+                        setServices((prev) => {
+                          const v = parseInt(e.target.value, 10);
+                          const next = [...prev];
+                          next[i] = { ...next[i], duration_minutes: Number.isFinite(v) ? Math.max(15, Math.min(480, v)) : 30 };
+                          return next;
+                        })
+                      }
+                      className="min-h-[44px] w-20 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 touch-manipulation"
+                    />
+                    <span className="text-sm text-slate-500">min</span>
+                    <button
+                      type="button"
+                      onClick={() => setServices((prev) => prev.filter((_, j) => j !== i))}
+                      className="rounded-lg p-2 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+                      aria-label="Remove"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setServices((prev) => [...prev, { id: "", name: "", duration_minutes: 30, enabled: true }])}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  <Plus className="h-4 w-4" /> Add type
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingServices || servicesUnchanged}
+                  className="min-h-[44px] rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50 touch-manipulation sm:py-2"
+                >
+                  {savingServices ? <Loader2 className="inline h-4 w-4 animate-spin" /> : null} Save
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      </section>
 
       {/* Chat widget branding: all plans can see; only Elite can customize; Pro/Starter see disabled + upgrade CTA */}
       <section>
@@ -205,7 +568,7 @@ export default function AppSettingsPage() {
                   href="/app/plan"
                   className="mt-4 inline-flex rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
                 >
-                  Upgrade to Elite
+                  Upgrade to Elite or Smart Booking Site
                 </Link>
               </>
             )}

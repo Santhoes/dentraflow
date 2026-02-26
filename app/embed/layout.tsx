@@ -1,9 +1,15 @@
 import "./embed.css";
+import { EmbedBodyTransparent } from "./EmbedBodyTransparent";
 
 export default function EmbedLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-[100dvh] w-full" style={{ minHeight: "320px" }}>
-      {children}
-    </div>
+    <EmbedBodyTransparent>
+      <div
+        className="min-h-0 w-full bg-transparent"
+        style={{ background: "transparent", backgroundColor: "transparent" }}
+      >
+        {children}
+      </div>
+    </EmbedBodyTransparent>
   );
 }

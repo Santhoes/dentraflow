@@ -1,23 +1,17 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getAuthContextFromRequest } from "@/lib/auth/app-auth";
 
 type Params = { params: Promise<{ id: string }> };
 
-async function getClinicId(token: string): Promise<string | null> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) return null;
-
-  const supabase = createClient(url, anonKey);
-  const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-  if (userError || !user) return null;
-
+async function getClinicId(request: Request): Promise<string | null> {
+  const ctx = await getAuthContextFromRequest(request);
+  if (!ctx) return null;
   const admin = createAdminClient();
   const { data: member } = await admin
     .from("clinic_members")
     .select("clinic_id")
-    .eq("user_id", user.id)
+    .eq("app_user_id", ctx.user.id)
     .limit(1)
     .maybeSingle();
   return member?.clinic_id ?? null;
@@ -28,12 +22,8 @@ async function getClinicId(token: string): Promise<string | null> {
  * DELETE /api/app/agents/[id] — delete agent.
  */
 export async function PATCH(request: Request, { params }: Params) {
-  const authHeader = request.headers.get("authorization");
-  const token = authHeader?.replace("Bearer ", "").trim();
-  if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const clinicId = await getClinicId(token);
-  if (!clinicId) return NextResponse.json({ error: "No clinic" }, { status: 403 });
+  const clinicId = await getClinicId(request);
+  if (!clinicId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
   if (!id?.trim()) return NextResponse.json({ error: "Invalid agent" }, { status: 400 });
@@ -104,12 +94,8 @@ export async function PATCH(request: Request, { params }: Params) {
 }
 
 export async function DELETE(request: Request, { params }: Params) {
-  const authHeader = request.headers.get("authorization");
-  const token = authHeader?.replace("Bearer ", "").trim();
-  if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const clinicId = await getClinicId(token);
-  if (!clinicId) return NextResponse.json({ error: "No clinic" }, { status: 403 });
+  const clinicId = await getClinicId(request);
+  if (!clinicId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
   if (!id?.trim()) return NextResponse.json({ error: "Invalid agent" }, { status: 400 });

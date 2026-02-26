@@ -11,16 +11,19 @@ export function ShippingContent() {
           animate={{ opacity: 1, y: 0 }}
           className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl"
         >
-          Shipping Policy
+          Shipping & Delivery Policy
         </motion.h1>
-        <motion.p
+        <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05 }}
-          className="mt-4 text-slate-500"
+          className="mt-4 space-y-1 text-slate-500"
         >
-          Last updated: February 2025
-        </motion.p>
+          <p>Effective Date: February 2025</p>
+          <p>Company Name: DentraFlow</p>
+          <p>Website: https://www.dentraflow.com</p>
+          <p>Contact Email: support@dentraflow.com</p>
+        </motion.div>
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -28,34 +31,68 @@ export function ShippingContent() {
           className="mt-10 space-y-8 text-slate-600 break-words"
         >
           <section>
-            <h2 className="text-xl font-semibold text-slate-900">Digital service only</h2>
-            <p>
-              DentraFlow is a software-as-a-service (SaaS) product. We do not sell or ship any physical goods. There are no shipping fees, delivery addresses, or physical delivery times. This policy explains how and when you receive access to our digital Service.
+            <h2 className="text-xl font-semibold text-slate-900">1. Overview</h2>
+            <p className="mt-2">
+              DentraFlow is a software-as-a-service (SaaS) platform that provides AI-powered appointment booking and communication tools for dental clinics.
+            </p>
+            <ul className="mt-2 list-disc space-y-1 pl-6">
+              <li>We do not sell or ship physical products.</li>
+              <li>All services are delivered digitally.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-slate-900">2. Digital Service Delivery</h2>
+            <p className="mt-2">
+              Upon successful subscription payment:
+            </p>
+            <ul className="mt-2 list-disc space-y-1 pl-6">
+              <li>Clinic accounts are activated immediately or within a short processing period.</li>
+              <li>Access credentials are delivered electronically via email.</li>
+              <li>Platform access is provided through our web-based dashboard.</li>
+              <li>No physical items are shipped.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-slate-900">3. Appointment Deposits</h2>
+            <p className="mt-2">
+              When patients pay appointment deposits through clinics using DentraFlow:
+            </p>
+            <ul className="mt-2 list-disc space-y-1 pl-6">
+              <li>Payments are processed digitally through third-party payment providers.</li>
+              <li>No physical goods are delivered.</li>
+              <li>The payment confirms an appointment reservation with the dental clinic.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-slate-900">4. Service Availability</h2>
+            <p className="mt-2">
+              As a cloud-based software platform:
+            </p>
+            <ul className="mt-2 list-disc space-y-1 pl-6">
+              <li>Services are accessible online.</li>
+              <li>Access may be subject to maintenance, updates, or technical interruptions.</li>
+              <li>DentraFlow does not guarantee uninterrupted access at all times.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-slate-900">5. International Access</h2>
+            <p className="mt-2">
+              DentraFlow services are delivered electronically and are accessible internationally, subject to local internet availability and applicable laws.
             </p>
           </section>
+
           <section>
-            <h2 className="text-xl font-semibold text-slate-900">When you get access</h2>
-            <p>
-              &quot;Delivery&quot; of the Service means your access to the DentraFlow platform. Access begins once you have created an account and completed the signup process. If your plan requires payment, access is activated once your first payment has been successfully processed. You can then log in to the app, configure your clinic and AI agents, and use the chat widget and other features immediately. There is no waiting period for digital delivery—access is effective as soon as your account and payment (if applicable) are in place.
+            <h2 className="text-xl font-semibold text-slate-900">6. Contact Information</h2>
+            <p className="mt-2">
+              If you have questions regarding service access or account activation:
             </p>
-          </section>
-          <section>
-            <h2 className="text-xl font-semibold text-slate-900">How the service is delivered</h2>
-            <p>
-              The Service is delivered over the internet. You access it through a web browser and, where applicable, by embedding our chat widget on your website. No software is shipped to you; everything runs in the cloud. You are responsible for having a compatible device and internet connection. The Service is generally available 24/7, subject to our uptime and maintenance practices.
-            </p>
-          </section>
-          <section>
-            <h2 className="text-xl font-semibold text-slate-900">Geographic availability</h2>
-            <p>
-              DentraFlow is available in the regions where we offer the Service from our website. If you are in a supported region and have completed signup and payment (if required), you have the same access as other customers. We do not guarantee availability in every country; restrictions may apply based on payment methods, regulations, or operational decisions. If you have questions about availability in your area, contact us via the Contact page.
-            </p>
-          </section>
-          <section>
-            <h2 className="text-xl font-semibold text-slate-900">Contact</h2>
-            <p>
-              For questions about this Shipping Policy or about when your access begins, contact us via the Contact page or at support@dentraflow.com.
-            </p>
+            <p className="mt-4 font-medium text-slate-800">DentraFlow</p>
+            <p className="mt-1">Email: support@dentraflow.com</p>
+            <p className="mt-1">Website: https://www.dentraflow.com</p>
           </section>
         </motion.div>
       </div>

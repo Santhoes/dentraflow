@@ -1,0 +1,27 @@
+{"sessionId":"5fc85e","location":"login:entry","message":"login attempt","data":{"hasEmail":true,"hasPassword":true},"hypothesisId":"H1","timestamp":1772083934823}
+{"sessionId":"5fc85e","location":"login:afterDb","message":"app_users lookup","data":{"userFound":false,"hasPasswordHash":false},"hypothesisId":"H1","timestamp":1772083945459}
+{"sessionId":"5fc85e","location":"login:401_no_user","message":"401 user not found","data":{},"hypothesisId":"H1","timestamp":1772083945651}
+{"sessionId":"5fc85e","location":"login:entry","message":"login attempt","data":{"hasEmail":true,"hasPassword":true},"hypothesisId":"H1","timestamp":1772084004577}
+{"sessionId":"5fc85e","location":"login:afterDb","message":"app_users lookup","data":{"userFound":false,"hasPasswordHash":false},"hypothesisId":"H1","timestamp":1772084015211}
+{"sessionId":"5fc85e","location":"login:401_no_user","message":"401 user not found","data":{},"hypothesisId":"H1","timestamp":1772084015403}
+{"sessionId":"5fc85e","location":"login:entry","message":"login attempt","data":{"hasEmail":true,"hasPassword":true},"hypothesisId":"H1","timestamp":1772084075761}
+{"sessionId":"5fc85e","location":"login:afterDb","message":"app_users lookup","data":{"userFound":false,"hasPasswordHash":false},"hypothesisId":"H1","timestamp":1772084086408}
+{"sessionId":"5fc85e","location":"login:401_no_user","message":"401 user not found","data":{},"hypothesisId":"H1","timestamp":1772084086610}
+{"sessionId":"5fc85e","location":"login:entry","message":"login attempt","data":{"hasEmail":true,"hasPassword":true},"hypothesisId":"H1","timestamp":1772084308205}
+{"sessionId":"5fc85e","location":"login:afterDb","message":"app_users lookup","data":{"userFound":false,"hasPasswordHash":false},"hypothesisId":"H1","timestamp":1772084329424}
+{"sessionId":"5fc85e","location":"login:401_no_user","message":"401 user not found","data":{},"hypothesisId":"H1","timestamp":1772084329614}
+{"sessionId":"5fc85e","location":"login:entry","message":"login attempt","data":{"hasEmail":true,"hasPassword":true},"hypothesisId":"H1","timestamp":1772084467030}
+{"sessionId":"5fc85e","location":"login:afterDb","message":"app_users lookup","data":{"userFound":false,"hasPasswordHash":false},"hypothesisId":"H1","timestamp":1772084488356}
+{"sessionId":"5fc85e","location":"login:401_no_user","message":"401 user not found","data":{},"hypothesisId":"H1","timestamp":1772084488518}
+{"sessionId":"5fc85e","location":"login:entry","message":"login attempt","data":{"hasEmail":true,"hasPassword":true},"hypothesisId":"H1","timestamp":1772084601640}
+{"sessionId":"5fc85e","location":"login:afterDb","message":"app_users lookup","data":{"userFound":false,"hasPasswordHash":false},"hypothesisId":"H1","timestamp":1772084622805}
+{"sessionId":"5fc85e","location":"login:401_no_user","message":"401 user not found","data":{},"hypothesisId":"H1","timestamp":1772084622990}
+{"sessionId":"5fc85e","location":"login:entry","message":"login attempt","data":{"hasEmail":true,"hasPassword":true},"hypothesisId":"H1","timestamp":1772084774399}
+{"sessionId":"5fc85e","location":"login:afterDb","message":"app_users lookup","data":{"userFound":false,"hasPasswordHash":false},"hypothesisId":"H1","timestamp":1772084795580}
+{"sessionId":"5fc85e","location":"login:401_no_user","message":"401 user not found","data":{},"hypothesisId":"H1","timestamp":1772084795750}
+{"sessionId":"5fc85e","location":"login:entry","message":"login attempt","data":{"hasEmail":true,"hasPassword":true},"hypothesisId":"H1","timestamp":1772085141049}
+{"sessionId":"5fc85e","location":"login:afterDb","message":"app_users lookup","data":{"userFound":false,"hasPasswordHash":false},"hypothesisId":"H1","timestamp":1772085162287}
+{"sessionId":"5fc85e","location":"login:401_no_user","message":"401 user not found","data":{},"hypothesisId":"H1","timestamp":1772085162487}
+{"sessionId":"5fc85e","location":"login:entry","message":"login attempt","data":{"hasEmail":true,"hasPassword":true},"hypothesisId":"H1","timestamp":1772085222913}
+{"sessionId":"5fc85e","location":"login:afterDb","message":"app_users lookup","data":{"userFound":false,"hasPasswordHash":false},"hypothesisId":"H1","timestamp":1772085244159}
+{"sessionId":"5fc85e","location":"login:401_no_user","message":"401 user not found","data":{},"hypothesisId":"H1","timestamp":1772085244359}

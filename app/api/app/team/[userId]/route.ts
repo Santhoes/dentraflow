@@ -1,30 +1,24 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { hash } from "bcryptjs";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getAuthContextFromRequest } from "@/lib/auth/app-auth";
 
 async function getClinicIdAndCurrentUser(
-  token: string
+  request: Request
 ): Promise<{ clinicId: string; currentUserId: string; currentUserRole: string } | null> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) return null;
-
-  const supabase = createClient(url, anonKey);
-  const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-  if (userError || !user) return null;
-
+  const ctx = await getAuthContextFromRequest(request);
+  if (!ctx) return null;
   const admin = createAdminClient();
   const { data: member } = await admin
     .from("clinic_members")
     .select("clinic_id, role")
-    .eq("user_id", user.id)
+    .eq("app_user_id", ctx.user.id)
     .limit(1)
     .maybeSingle();
   if (!member?.clinic_id) return null;
-
   const clinicId = (member as { clinic_id: string }).clinic_id;
   const currentUserRole = (member as { role?: string }).role ?? "staff";
-  return { clinicId, currentUserId: user.id, currentUserRole };
+  return { clinicId, currentUserId: ctx.user.id, currentUserRole };
 }
 
 /**
@@ -34,12 +28,8 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ userId: string }> }
 ) {
-  const authHeader = request.headers.get("authorization");
-  const token = authHeader?.replace("Bearer ", "").trim();
-  if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const ctx = await getClinicIdAndCurrentUser(token);
-  if (!ctx) return NextResponse.json({ error: "No clinic" }, { status: 403 });
+  const ctx = await getClinicIdAndCurrentUser(request);
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   if (ctx.currentUserRole !== "owner") {
     return NextResponse.json({ error: "Only the main owner can remove staff." }, { status: 403 });
@@ -59,7 +49,7 @@ export async function DELETE(
     .from("clinic_members")
     .select("role")
     .eq("clinic_id", ctx.clinicId)
-    .eq("user_id", targetUserId)
+    .eq("app_user_id", targetUserId)
     .maybeSingle();
   if (fetchErr || !targetMember) {
     return NextResponse.json({ error: "Member not found" }, { status: 404 });
@@ -78,7 +68,7 @@ export async function DELETE(
     .from("clinic_members")
     .delete()
     .eq("clinic_id", ctx.clinicId)
-    .eq("user_id", targetUserId);
+    .eq("app_user_id", targetUserId);
   if (deleteErr) {
     return NextResponse.json({ error: "Failed to remove staff" }, { status: 500 });
   }
@@ -86,18 +76,14 @@ export async function DELETE(
 }
 
 /**
- * PATCH /api/app/team/[userId] — update staff role.
+ * PATCH /api/app/team/[userId] — update staff role and/or email/password (app_users).
  */
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ userId: string }> }
 ) {
-  const authHeader = request.headers.get("authorization");
-  const token = authHeader?.replace("Bearer ", "").trim();
-  if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const ctx = await getClinicIdAndCurrentUser(token);
-  if (!ctx) return NextResponse.json({ error: "No clinic" }, { status: 403 });
+  const ctx = await getClinicIdAndCurrentUser(request);
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   if (ctx.currentUserRole !== "owner") {
     return NextResponse.json({ error: "Only the main owner can edit staff roles." }, { status: 403 });
@@ -129,19 +115,26 @@ export async function PATCH(
     .from("clinic_members")
     .select("role")
     .eq("clinic_id", ctx.clinicId)
-    .eq("user_id", targetUserId)
+    .eq("app_user_id", targetUserId)
     .maybeSingle();
   if (fetchErr || !targetMember) {
     return NextResponse.json({ error: "Member not found" }, { status: 404 });
   }
 
   if (email || password) {
-    const updatePayload: { email?: string; password?: string } = {};
-    if (email) updatePayload.email = email;
-    if (password) updatePayload.password = password;
-    const { error: authErr } = await admin.auth.admin.updateUserById(targetUserId, updatePayload);
-    if (authErr) {
-      return NextResponse.json({ error: authErr.message || "Failed to update email/password" }, { status: 400 });
+    const updates: { email?: string; password_hash?: string; updated_at: string } = {
+      updated_at: new Date().toISOString(),
+    };
+    if (email) updates.email = email;
+    if (password) {
+      updates.password_hash = await hash(password, 10);
+    }
+    const { error: userErr } = await admin
+      .from("app_users")
+      .update(updates)
+      .eq("id", targetUserId);
+    if (userErr) {
+      return NextResponse.json({ error: userErr.message || "Failed to update email/password" }, { status: 400 });
     }
   }
 
@@ -164,7 +157,7 @@ export async function PATCH(
       .from("clinic_members")
       .update({ role })
       .eq("clinic_id", ctx.clinicId)
-      .eq("user_id", targetUserId);
+      .eq("app_user_id", targetUserId);
     if (updateErr) {
       return NextResponse.json({ error: "Failed to update role" }, { status: 500 });
     }

@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { isAdminEmail } from "@/lib/admin-auth";
 import {
   LayoutDashboard,
@@ -12,6 +11,7 @@ import {
   CreditCard,
   Calendar,
   MessageSquare,
+  Database,
   LogOut,
   Menu,
   X,
@@ -25,6 +25,7 @@ const NAV = [
   { label: "Billing", href: "/admin/billing", icon: CreditCard },
   { label: "Appointments", href: "/admin/appointments", icon: Calendar },
   { label: "Support", href: "/admin/support", icon: MessageSquare },
+  { label: "Clear table data", href: "/admin/data", icon: Database },
 ];
 
 export default function AdminLayout({
@@ -38,18 +39,23 @@ export default function AdminLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session?.user) {
+    fetch("/api/auth/me", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data: { user?: { email?: string; is_admin?: boolean } | null }) => {
+        if (!data?.user) {
+          router.replace("/login");
+          return;
+        }
+        const isAdmin = data.user.is_admin === true || (data.user.email && isAdminEmail(data.user.email));
+        if (!isAdmin) {
+          router.replace("/app");
+          return;
+        }
+        setLoading(false);
+      })
+      .catch(() => {
         router.replace("/login");
-        return;
-      }
-      if (!isAdminEmail(session.user.email)) {
-        router.replace("/app");
-        return;
-      }
-      setLoading(false);
-    });
+      });
   }, [router]);
 
   useEffect(() => {
@@ -61,8 +67,7 @@ export default function AdminLayout({
   }, []);
 
   const handleSignOut = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     router.replace("/login");
   };
 

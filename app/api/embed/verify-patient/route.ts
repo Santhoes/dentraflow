@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyClinicSignature } from "@/lib/chat-signature";
 import { isValidChatEmail, isValidChatPhone } from "@/lib/embed-validate";
+import { checkEmbedApiRateLimit, getClientIp } from "@/lib/embed-api-rate-limit";
 
 /**
  * POST /api/embed/verify-patient — find patient by email/phone and return upcoming appointments.
@@ -9,6 +10,12 @@ import { isValidChatEmail, isValidChatPhone } from "@/lib/embed-validate";
  * Returns: { ok: true, patient_name?, appointments: [{ id, start_time, end_time, reason? }] } or { ok: false, error }
  */
 export async function POST(request: Request) {
+  const ip = getClientIp(request);
+  const { allowed } = await checkEmbedApiRateLimit(ip);
+  if (!allowed) {
+    return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
+  }
+
   let body: {
     clinicSlug?: string;
     sig?: string;

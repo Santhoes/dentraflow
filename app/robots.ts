@@ -11,6 +11,8 @@ const allowedPaths = [
   "/contact",
   "/terms",
   "/privacy",
+  "/cookie",
+  "/dpa",
   "/refund",
   "/cancellation",
   "/shipping",

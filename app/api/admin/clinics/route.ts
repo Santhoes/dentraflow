@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireAdmin } from "@/lib/admin-auth-server";
 import { slugFromName } from "@/lib/supabase/types";
 
 const PAGE_SIZE = 20;
@@ -32,7 +32,7 @@ export async function GET(request: Request) {
 
   const { data: members, error: membersError } = await admin
     .from("clinic_members")
-    .select("clinic_id, user_id, role")
+    .select("clinic_id, app_user_id, role")
     .in("clinic_id", clinicIds);
 
   if (membersError) {
@@ -45,24 +45,40 @@ export async function GET(request: Request) {
   }
 
   const memberList = members || [];
-  const userIds = Array.from(new Set(memberList.map((m) => (m as { user_id: string }).user_id)));
-  const emailMap: Record<string, string> = {};
+  const appUserIds = Array.from(
+    new Set(
+      memberList
+        .map((m) => (m as { app_user_id: string | null }).app_user_id)
+        .filter((id): id is string => Boolean(id))
+    )
+  );
 
-  for (const uid of userIds) {
-    try {
-      const { data: { user } } = await admin.auth.admin.getUserById(uid);
-      if (user?.email) emailMap[uid] = user.email;
-    } catch {
-      emailMap[uid] = "(unknown)";
+  const emailMap: Record<string, string> = {};
+  if (appUserIds.length > 0) {
+    const { data: appUsers, error: appUsersError } = await admin
+      .from("app_users")
+      .select("id, email")
+      .in("id", appUserIds);
+
+    if (appUsersError) {
+      console.error("admin clinics app_users lookup", appUsersError);
+    } else {
+      for (const u of appUsers || []) {
+        const row = u as { id: string; email: string | null };
+        if (row.email) {
+          emailMap[row.id] = row.email;
+        }
+      }
     }
   }
 
   const staffByClinic: Record<string, { email: string; role: string }[]> = {};
   for (const m of memberList) {
-    const row = m as { clinic_id: string; user_id: string; role: string };
+    const row = m as { clinic_id: string; app_user_id: string | null; role: string };
     if (!staffByClinic[row.clinic_id]) staffByClinic[row.clinic_id] = [];
+    const email = row.app_user_id ? emailMap[row.app_user_id] ?? "(unknown)" : "(unknown)";
     staffByClinic[row.clinic_id].push({
-      email: emailMap[row.user_id] ?? "(unknown)",
+      email,
       role: row.role,
     });
   }

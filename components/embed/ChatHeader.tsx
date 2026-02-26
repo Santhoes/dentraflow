@@ -10,6 +10,8 @@ interface ChatHeaderProps {
   onToggleDark: () => void;
   onMinimize: () => void;
   headerColor: string;
+  /** When true (e.g. in embed), hide the minimize (X) button; host controls visibility. */
+  hideMinimize?: boolean;
 }
 
 export function ChatHeader({
@@ -19,6 +21,7 @@ export function ChatHeader({
   onToggleDark,
   onMinimize,
   headerColor,
+  hideMinimize,
 }: ChatHeaderProps) {
   return (
     <header
@@ -61,16 +64,18 @@ export function ChatHeader({
         >
           {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
         </motion.button>
-        <motion.button
-          type="button"
-          onClick={onMinimize}
-          className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full p-2 opacity-90 transition-opacity hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-white touch-manipulation"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          aria-label="Minimize chat"
-        >
-          <X className="h-5 w-5" />
-        </motion.button>
+        {!hideMinimize && (
+          <motion.button
+            type="button"
+            onClick={onMinimize}
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full p-2 opacity-90 transition-opacity hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-white touch-manipulation"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            aria-label="Minimize chat"
+          >
+            <X className="h-5 w-5" />
+          </motion.button>
+        )}
       </div>
     </header>
   );

@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useApp } from "@/lib/app-context";
-import { createClient } from "@/lib/supabase/client";
 import { Loader2, UsersRound, Plus, Pencil, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { planAtLeast } from "@/lib/plan-features";
@@ -33,11 +32,7 @@ export default function AppTeamPage() {
   const [savingRole, setSavingRole] = useState(false);
 
   const fetchTeam = useCallback(async () => {
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
-    if (!token) return;
-    const res = await fetch("/api/app/team", { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch("/api/app/team", { credentials: "include" });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
       setMembers(data.members ?? []);
@@ -63,17 +58,10 @@ export default function AppTeamPage() {
     if (!addEmail.trim() || !addPassword) return;
     setAdding(true);
     setAddError(null);
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
-    if (!token) {
-      setAddError("Please sign in again.");
-      setAdding(false);
-      return;
-    }
     const res = await fetch("/api/app/team", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: addEmail.trim(), password: addPassword, role: addRole }),
     });
     const data = await res.json().catch(() => ({}));
@@ -91,16 +79,9 @@ export default function AppTeamPage() {
   const handleRemove = async (userId: string) => {
     if (!window.confirm("Remove this staff member from the clinic? They will no longer have access.")) return;
     setRemovingId(userId);
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
-    if (!token) {
-      setRemovingId(null);
-      return;
-    }
     const res = await fetch(`/api/app/team/${userId}`, {
       method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
+      credentials: "include",
     });
     if (res.ok) await fetchTeam();
     setRemovingId(null);
@@ -110,14 +91,6 @@ export default function AppTeamPage() {
     if (!editRole.trim()) return;
     if (editPassword && editPassword.length < 6) return;
     setSavingRole(true);
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
-    if (!token) {
-      setSavingRole(false);
-      setEditingId(null);
-      return;
-    }
     const payload: { role: string; email?: string; password?: string } = { role: editRole.trim() };
     if (editEmail.trim() && editEmail.trim().toLowerCase() !== currentEmail.toLowerCase()) {
       payload.email = editEmail.trim().toLowerCase();
@@ -125,7 +98,8 @@ export default function AppTeamPage() {
     if (editPassword.trim()) payload.password = editPassword;
     const res = await fetch(`/api/app/team/${userId}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     const data = await res.json().catch(() => ({}));
@@ -189,8 +163,8 @@ export default function AppTeamPage() {
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-slate-900">Add staff</h2>
           <p className="mt-0.5 text-sm text-slate-600">Create an account for a staff member. They will use this email and password to log in.</p>
-          <form onSubmit={handleAddStaff} className="mt-4 flex flex-wrap items-end gap-3">
-            <div className="min-w-0 flex-1">
+          <form onSubmit={handleAddStaff} className="mt-4 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:gap-3">
+            <div className="min-w-0 flex-1 sm:min-w-[140px]">
               <label htmlFor="team-email" className="block text-xs font-medium text-slate-600">Email</label>
               <input
                 id="team-email"
@@ -202,7 +176,7 @@ export default function AppTeamPage() {
                 required
               />
             </div>
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 sm:min-w-[140px]">
               <label htmlFor="team-password" className="block text-xs font-medium text-slate-600">Password</label>
               <input
                 id="team-password"
@@ -215,13 +189,13 @@ export default function AppTeamPage() {
                 required
               />
             </div>
-            <div>
+            <div className="min-w-0 sm:min-w-0">
               <label htmlFor="team-role" className="block text-xs font-medium text-slate-600">Role</label>
               <select
                 id="team-role"
                 value={addRole}
                 onChange={(e) => setAddRole(e.target.value)}
-                className="mt-0.5 rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                className="mt-0.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm sm:w-auto"
               >
                 <option value="staff">Staff</option>
                 <option value="owner">Owner</option>
@@ -230,9 +204,9 @@ export default function AppTeamPage() {
             <button
               type="submit"
               disabled={adding}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50"
+              className="w-full shrink-0 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50 sm:w-auto touch-manipulation"
             >
-              {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              {adding ? <Loader2 className="inline h-4 w-4 animate-spin" /> : <Plus className="inline h-4 w-4" />}
               Add
             </button>
           </form>
@@ -257,17 +231,17 @@ export default function AppTeamPage() {
             members.map((m) => (
               <li
                 key={m.user_id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/50 px-4 py-3"
+                className="flex flex-col gap-2 rounded-lg border border-slate-100 bg-slate-50/50 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-2"
               >
                 <div className="min-w-0 flex-1">
                   <span className="font-medium text-slate-900">{m.email}</span>
                   {editingId === m.user_id ? (
-                    <div className="mt-2 space-y-2">
-                      <div className="flex flex-wrap items-center gap-2">
+                    <div className="mt-2 space-y-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                         <select
                           value={editRole}
                           onChange={(e) => setEditRole(e.target.value)}
-                          className="rounded-lg border border-slate-200 px-2 py-1 text-sm"
+                          className="w-full rounded-lg border border-slate-200 px-2 py-2 text-sm sm:w-auto sm:min-w-[100px]"
                         >
                           <option value="staff">Staff</option>
                           <option value="owner">Owner</option>
@@ -277,7 +251,7 @@ export default function AppTeamPage() {
                           value={editEmail}
                           onChange={(e) => setEditEmail(e.target.value)}
                           placeholder="Email"
-                          className="rounded-lg border border-slate-200 px-2 py-1 text-sm min-w-[180px]"
+                          className="w-full min-w-0 rounded-lg border border-slate-200 px-2 py-2 text-sm sm:min-w-[180px]"
                         />
                         <input
                           type="password"
@@ -285,22 +259,22 @@ export default function AppTeamPage() {
                           onChange={(e) => setEditPassword(e.target.value)}
                           placeholder="New password (optional)"
                           minLength={6}
-                          className="rounded-lg border border-slate-200 px-2 py-1 text-sm min-w-[140px]"
+                          className="w-full min-w-0 rounded-lg border border-slate-200 px-2 py-2 text-sm sm:min-w-[140px]"
                         />
                       </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-2">
                         <button
                           type="button"
                           onClick={() => handleEditStaff(m.user_id, m.email)}
                           disabled={savingRole}
-                          className="rounded-lg bg-primary px-2 py-1 text-xs font-medium text-white hover:bg-primary/90 disabled:opacity-50"
+                          className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50 touch-manipulation"
                         >
                           {savingRole ? "Saving…" : "Save"}
                         </button>
                         <button
                           type="button"
                           onClick={() => { setEditingId(null); setEditPassword(""); }}
-                          className="rounded p-1 text-slate-500 hover:bg-slate-200"
+                          className="rounded p-2 text-slate-500 hover:bg-slate-200 touch-manipulation"
                         >
                           <X className="h-4 w-4" />
                         </button>
@@ -312,14 +286,14 @@ export default function AppTeamPage() {
                     </span>
                   )}
                 </div>
-                {editingId !== m.user_id && isOwner && (
-                  <div className="flex items-center gap-1">
+                  {editingId !== m.user_id && isOwner && (
+                  <div className="flex items-center gap-1 shrink-0">
                     {m.role !== "owner" && (
                       <>
                         <button
                           type="button"
                           onClick={() => { setError(null); setEditingId(m.user_id); setEditRole(m.role); setEditEmail(m.email); setEditPassword(""); }}
-                          className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                          className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 touch-manipulation"
                           aria-label="Edit role"
                         >
                           <Pencil className="h-4 w-4" />
@@ -328,7 +302,7 @@ export default function AppTeamPage() {
                           type="button"
                           onClick={() => handleRemove(m.user_id)}
                           disabled={m.user_id === currentUserId || removingId === m.user_id}
-                          className="rounded-lg p-2 text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="rounded-lg p-2 text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
                           aria-label="Remove"
                           title={m.user_id === currentUserId ? "You cannot remove yourself" : "Remove from team"}
                         >

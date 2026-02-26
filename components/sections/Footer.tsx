@@ -10,6 +10,8 @@ const FOOTER_LINKS = [
 const LEGAL_LINKS = [
   { label: "Terms & Conditions", href: "/terms" },
   { label: "Privacy Policy", href: "/privacy" },
+  { label: "Cookie Policy", href: "/cookie" },
+  { label: "Data Processing Agreement", href: "/dpa" },
   { label: "Refund Policy", href: "/refund" },
   { label: "Cancellation Policy", href: "/cancellation" },
   { label: "Shipping Policy", href: "/shipping" },

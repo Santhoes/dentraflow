@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   MapPin,
@@ -11,6 +11,9 @@ import {
   Building2,
   CalendarX2,
   Code2,
+  Copy,
+  Check,
+  ExternalLink,
 } from "lucide-react";
 import { COUNTRIES, TIMEZONES } from "@/lib/supabase/types";
 import { formatPlanLimit } from "@/lib/plan-features";
@@ -34,6 +37,8 @@ export interface LocationsMainContentClinic {
   working_hours?: Record<string, { open: string; close: string } | null> | null;
   accepts_insurance?: boolean;
   insurance_notes?: string | null;
+  plan?: string | null;
+  slug?: string | null;
 }
 
 export interface LocationsMainContentProps {
@@ -82,6 +87,8 @@ export interface LocationsMainContentProps {
   DAYS: readonly string[];
   DAY_LABELS: Record<string, string>;
   onGetEmbed?: (locationId: string | null, label: string) => void;
+  /** When set, show the Smart Booking Page section (plan === smart_booking). */
+  bookingPageUrl?: string | null;
 }
 
 export function LocationsMainContent(props: LocationsMainContentProps) {
@@ -131,7 +138,29 @@ export function LocationsMainContent(props: LocationsMainContentProps) {
     DAYS,
     DAY_LABELS,
     onGetEmbed,
+    bookingPageUrl,
   } = props;
+
+  const [bookingPageCopied, setBookingPageCopied] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!bookingPageUrl) return;
+    import("qrcode").then((mod) => {
+      const toDataURL = mod.default?.toDataURL ?? mod.toDataURL;
+      if (toDataURL) {
+        toDataURL(bookingPageUrl, { width: 160, margin: 1 })
+          .then(setQrDataUrl)
+          .catch(() => {});
+      }
+    });
+  }, [bookingPageUrl]);
+
+  useEffect(() => {
+    if (!bookingPageCopied) return;
+    const t = setTimeout(() => setBookingPageCopied(false), 2000);
+    return () => clearTimeout(t);
+  }, [bookingPageCopied]);
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 sm:space-y-8">
@@ -177,7 +206,7 @@ export function LocationsMainContent(props: LocationsMainContentProps) {
                 >
                   <Pencil className="h-4 w-4" />
                 </button>
-                {canAccess && onGetEmbed && (
+                {onGetEmbed && (
                   <button
                     type="button"
                     onClick={() => onGetEmbed(null, "Primary")}
@@ -287,11 +316,63 @@ export function LocationsMainContent(props: LocationsMainContentProps) {
         </div>
       </div>
 
+      {/* Smart Booking Page — only for Smart Booking Site plan */}
+      {bookingPageUrl && (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 shadow-sm sm:p-6">
+          <h2 className="font-semibold text-slate-900">Smart Booking Page</h2>
+          <p className="mt-0.5 text-sm text-slate-600">
+            Your dedicated booking page. Share this link or the QR code so patients can book directly.
+          </p>
+          <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
+            <div className="min-w-0 flex-1">
+              <label className="block text-xs font-medium text-slate-500">Booking page URL</label>
+              <div className="mt-1 flex gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={bookingPageUrl}
+                  className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs text-slate-700"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(bookingPageUrl);
+                    setBookingPageCopied(true);
+                  }}
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  {bookingPageCopied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                  {bookingPageCopied ? "Copied" : "Copy"}
+                </button>
+                <a
+                  href={bookingPageUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  <ExternalLink className="h-4 w-4" /> Open
+                </a>
+              </div>
+            </div>
+            {qrDataUrl && (
+              <div className="shrink-0">
+                <label className="block text-xs font-medium text-slate-500">QR code</label>
+                <div className="mt-1 rounded-lg border border-slate-200 bg-white p-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={qrDataUrl} alt="QR code for booking page" className="h-32 w-32" />
+                </div>
+                <p className="mt-1 text-xs text-slate-500">Scan to open your booking page</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {canAccess && atLimit && (
         <p className="text-center text-sm text-slate-500">
           You&apos;ve reached your plan limit ({formatPlanLimitProp(limit)} locations).{" "}
           <Link href="/app/plan" className="font-medium text-primary hover:underline">
-            Upgrade to Elite for unlimited locations
+            Upgrade to Elite or Smart Booking Site for more locations
           </Link>
         </p>
       )}
@@ -471,7 +552,7 @@ export function LocationsMainContent(props: LocationsMainContentProps) {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700">WhatsApp number *</label>
+                <label className="block text-sm font-medium text-slate-700">Phone number *</label>
                 <p className="mt-0.5 text-xs text-slate-500">Required for this location. Include country code (e.g. +1 234 567 8900).</p>
                 <input
                   type="tel"
@@ -585,7 +666,7 @@ export function LocationsMainContent(props: LocationsMainContentProps) {
           >
             <div className="shrink-0 border-b border-slate-100 px-4 py-3 sm:px-6">
               <h3 className="text-lg font-semibold text-slate-900">Edit primary location</h3>
-              <p className="mt-0.5 text-sm text-slate-600">Main clinic name, address, timezone, and WhatsApp number.</p>
+              <p className="mt-0.5 text-sm text-slate-600">Main clinic name, address, timezone, and phone number.</p>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
               <div>
@@ -672,7 +753,7 @@ export function LocationsMainContent(props: LocationsMainContentProps) {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700">WhatsApp number *</label>
+                <label className="block text-sm font-medium text-slate-700">Phone number *</label>
                 <p className="mt-0.5 text-xs text-slate-500">Used for reminders and booking notifications (Elite). Include country code.</p>
                 <input
                   type="tel"

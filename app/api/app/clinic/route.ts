@@ -1,27 +1,44 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getAuthContextFromRequest } from "@/lib/auth/app-auth";
 import { sendResendEmail } from "@/lib/resend";
+import { slugFromName } from "@/lib/supabase/types";
+
+const MAX_POLICY_LENGTH = 15000;
+const MAX_PAYPAL_MERCHANT_ID_LENGTH = 64;
+const PAYPAL_MERCHANT_ID_REGEX = /^[A-Za-z0-9_-]+$/;
+
+function validateDepositRules(value: unknown): Record<string, unknown> | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "object" || Array.isArray(value)) return null;
+  const obj = value as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  if (typeof obj.default_amount === "number" && obj.default_amount >= 0 && obj.default_amount <= 100000) {
+    out.default_amount = Math.round(obj.default_amount * 100) / 100;
+  }
+  if (typeof obj.currency === "string" && /^[A-Z]{3}$/.test(obj.currency.trim())) {
+    out.currency = obj.currency.trim();
+  }
+  if (typeof obj.by_service === "object" && obj.by_service !== null && !Array.isArray(obj.by_service)) {
+    const byService: Record<string, number> = {};
+    for (const [k, v] of Object.entries(obj.by_service)) {
+      if (typeof k === "string" && typeof v === "number" && v >= 0 && v <= 100000) {
+        byService[k.trim().slice(0, 200)] = Math.round(v * 100) / 100;
+      }
+    }
+    if (Object.keys(byService).length > 0) out.by_service = byService;
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
 
 /**
  * PATCH /api/app/clinic — update clinic details. Requires auth; user must be a clinic member.
- * Body: { name?, country?, timezone?, phone?, accepts_insurance?, insurance_notes?, working_hours?, website_domain?, logo_url?, widget_primary_color?, widget_background_color?, whatsapp_phone?, default_appointment_charge?, settings_completed_at?, address_line1?, address_line2?, city?, state?, postal_code? }
+ * Body: { name?, country?, timezone?, ... cancellation_policy_text?, paypal_merchant_id?, deposit_required?, deposit_rules_json? (Elite only) }
  * Sends email to clinic team (members) about the update.
  */
 export async function PATCH(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  const token = authHeader?.replace("Bearer ", "").trim();
-  if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) return NextResponse.json({ error: "Server config" }, { status: 500 });
-
-  const supabase = createClient(url, anonKey);
-  const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-  if (userError || !user) {
-    return NextResponse.json({ error: "Invalid session" }, { status: 401 });
-  }
+  const ctx = await getAuthContextFromRequest(request);
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let body: Record<string, unknown>;
   try {
@@ -34,7 +51,7 @@ export async function PATCH(request: Request) {
   const { data: member } = await admin
     .from("clinic_members")
     .select("clinic_id")
-    .eq("user_id", user.id)
+    .eq("app_user_id", ctx.user.id)
     .limit(1)
     .maybeSingle();
 
@@ -43,9 +60,27 @@ export async function PATCH(request: Request) {
   }
 
   const clinicId = (member as { clinic_id: string }).clinic_id;
-  const { data: currentClinic } = await admin.from("clinics").select("name").eq("id", clinicId).single();
+  const { data: currentClinic } = await admin
+    .from("clinics")
+    .select("name, slug, plan")
+    .eq("id", clinicId)
+    .single();
+  const plan = (currentClinic as { plan?: string } | null)?.plan ?? "starter";
+  const isElite = plan === "elite";
+
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  if (typeof body.name === "string") updates.name = body.name.trim();
+  if (typeof body.name === "string") {
+    const name = body.name.trim();
+    updates.name = name;
+    const newSlug = slugFromName(name);
+    const { data: existingBySlug } = await admin
+      .from("clinics")
+      .select("id")
+      .eq("slug", newSlug)
+      .neq("id", clinicId)
+      .maybeSingle();
+    updates.slug = existingBySlug ? `${newSlug}-${Date.now().toString(36)}` : newSlug;
+  }
   if (typeof body.country === "string") updates.country = body.country.trim();
   if (typeof body.timezone === "string") updates.timezone = body.timezone;
   if (typeof body.phone === "string") updates.phone = body.phone.trim() || null;
@@ -67,6 +102,30 @@ export async function PATCH(request: Request) {
   if (typeof body.state === "string") updates.state = body.state.trim() || null;
   if (typeof body.postal_code === "string") updates.postal_code = body.postal_code.trim() || null;
 
+  if (typeof body.cancellation_policy_text === "string") {
+    const policy = body.cancellation_policy_text.trim();
+    updates.cancellation_policy_text = policy.length <= MAX_POLICY_LENGTH ? (policy || null) : policy.slice(0, MAX_POLICY_LENGTH);
+  }
+  if (body.cancellation_policy_text === null) updates.cancellation_policy_text = null;
+
+  if (isElite) {
+    if (typeof body.paypal_merchant_id === "string") {
+      const raw = body.paypal_merchant_id.trim();
+      if (raw === "") {
+        updates.paypal_merchant_id = null;
+      } else if (raw.length <= MAX_PAYPAL_MERCHANT_ID_LENGTH && PAYPAL_MERCHANT_ID_REGEX.test(raw)) {
+        updates.paypal_merchant_id = raw;
+      }
+    }
+    if (body.paypal_merchant_id === null) updates.paypal_merchant_id = null;
+    if (typeof body.deposit_required === "boolean") updates.deposit_required = body.deposit_required;
+    if (typeof body.require_policy_agreement === "boolean") updates.require_policy_agreement = body.require_policy_agreement;
+    if (body.deposit_rules_json !== undefined) {
+      const parsed = validateDepositRules(body.deposit_rules_json);
+      updates.deposit_rules_json = parsed;
+    }
+  }
+
   const { error: updateError } = await admin
     .from("clinics")
     .update(updates)
@@ -79,17 +138,13 @@ export async function PATCH(request: Request) {
   const clinicName = (updates.name as string) || (currentClinic as { name?: string } | null)?.name || "Clinic";
   const { data: members } = await admin
     .from("clinic_members")
-    .select("user_id")
+    .select("app_user_id")
     .eq("clinic_id", clinicId);
-  const userIds = (members || []).map((m: { user_id: string }) => m.user_id);
+  const appUserIds = (members || []).map((m: { app_user_id: string | null }) => m.app_user_id).filter(Boolean) as string[];
   const emails: string[] = [];
-  for (const uid of userIds) {
-    try {
-      const { data: { user } } = await admin.auth.admin.getUserById(uid);
-      if (user?.email) emails.push(user.email);
-    } catch {
-      // skip
-    }
+  if (appUserIds.length > 0) {
+    const { data: users } = await admin.from("app_users").select("email").in("id", appUserIds);
+    for (const u of users ?? []) emails.push((u as { email: string }).email);
   }
   if (emails.length > 0) {
     await sendResendEmail({

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getAuthContextFromRequest } from "@/lib/auth/app-auth";
 
 /**
  * POST /api/app/support/[id]/reply — add a follow-up message to an existing case. Reopens case if closed.
@@ -10,17 +10,8 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authHeader = request.headers.get("authorization");
-  const token = authHeader?.replace("Bearer ", "").trim();
-  if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) return NextResponse.json({ error: "Server config" }, { status: 500 });
-
-  const supabase = createClient(url, anonKey);
-  const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-  if (userError || !user) return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+  const ctx = await getAuthContextFromRequest(request);
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id: caseId } = await params;
   if (!caseId) return NextResponse.json({ error: "Case ID required" }, { status: 400 });
@@ -38,7 +29,7 @@ export async function POST(
   const { data: member } = await admin
     .from("clinic_members")
     .select("clinic_id")
-    .eq("user_id", user.id)
+    .eq("app_user_id", ctx.user.id)
     .limit(1)
     .maybeSingle();
   if (!member?.clinic_id) return NextResponse.json({ error: "No clinic" }, { status: 403 });
@@ -64,7 +55,7 @@ export async function POST(
   const { error: insertErr } = await admin.from("support_replies").insert({
     case_id: caseId,
     from_role: "user",
-    user_id: user.id,
+    app_user_id: ctx.user.id,
     body: message,
   });
   if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });

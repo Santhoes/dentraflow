@@ -151,7 +151,7 @@ function buildSystemPrompt(clinic: {
     : "";
 
   const modifyCancelBlock = `
-Change/cancel: User says "change", "reschedule", "cancel" → ask for WhatsApp or email once, then suggest 2–3 times or call cancel_appointment/modify_appointment. If appointment is within 2 hours, say: "Please call the clinic for urgent changes." After every booking: "Need to change or cancel? Just type 'change' or 'cancel'."`;
+Change/cancel: User says "change", "reschedule", "cancel" → ask for email or phone once, then suggest 2–3 times or call cancel_appointment/modify_appointment. If appointment is within 2 hours, say: "Please call the clinic for urgent changes." After every booking: "Need to change or cancel? Just type 'change' or 'cancel'."`;
 
   return `${intro}
 
@@ -162,7 +162,7 @@ Rules:
 - Offer action buttons whenever possible (e.g. time slots, Yes/No, Morning/Afternoon).
 - Tone: professional, warm, direct. Calm and human-like. Do not sound robotic.
 - Only suggest calling the clinic for severe emergency (see below). For normal pain, proceed to booking.
-- Collect in order: preferred date → time → name → email or WhatsApp. One question at a time.
+- Collect in order: preferred date → time → name → email (or phone). One question at a time.
 - When you have date, time, name, and at least one contact, call book_appointment(patient_name, patient_email, patient_whatsapp, start_time, end_time). Today: ${clinic.todayDate}. Timezone: ${clinic.timezone}. Use 30-min slots; output start_time and end_time in ISO (e.g. 2025-02-25T14:00:00).
 ${returningBlock}
 - Hours: ${hours}
@@ -187,7 +187,7 @@ Smart answers (keep to 1–2 sentences, then offer to book):
 - "I'm scared of dentists": "That's okay. We focus on gentle care. Would you like a consultation first?"
 - "Do you treat kids?": "Yes, we see children 5+. Would you like to book for your child?"
 
-When user mentions pain (manageable), you may say "Same-day slots available" when true. After booking confirmation, you may ask "Would you like WhatsApp reminders?" (Yes/No). For treatments (e.g. root canal): one sentence only—e.g. "Root canal saves the tooth and relieves pain. Would you like a consultation?"
+When user mentions pain (manageable), you may say "Same-day slots available" when true. After booking confirmation, you may ask "Would you like email reminders?" (Yes/No). For treatments (e.g. root canal): one sentence only—e.g. "Root canal saves the tooth and relieves pain. Would you like a consultation?"
 
 ${(clinic.availableSlots?.length ?? 0) > 0 ? `When asking for time, suggest ONLY these slots (patient can tap): ${clinic.availableSlots!.map((s) => s.label).join(", ")}. Use exact start time ISO when they pick one.` : ""}
 Never give medical diagnosis. Never ask all questions at once. Never promise unavailable times.`;
@@ -198,13 +198,13 @@ const BOOK_APPOINTMENT_TOOL = {
   function: {
     name: "book_appointment",
     description:
-      "Call when you have preferred date, time, name, and at least one of email or WhatsApp. Creates the appointment. At least one contact (email or WhatsApp) required.",
+      "Call when you have preferred date, time, name, and at least one of email or phone. Creates the appointment. At least one contact (email or phone) required.",
     parameters: {
       type: "object",
       properties: {
         patient_name: { type: "string", description: "Full name" },
         patient_email: { type: "string", description: "Email (optional if patient_whatsapp provided)" },
-        patient_whatsapp: { type: "string", description: "WhatsApp/phone (optional if patient_email provided)" },
+        patient_whatsapp: { type: "string", description: "Phone (optional if patient_email provided)" },
         start_time: { type: "string", description: "ISO 8601 e.g. 2025-02-25T14:00:00" },
         end_time: { type: "string", description: "ISO 8601, 30 min after start" },
       },
@@ -217,12 +217,12 @@ const MODIFY_APPOINTMENT_TOOL = {
   type: "function" as const,
   function: {
     name: "modify_appointment",
-    description: "Reschedule an existing appointment. Need patient_email or patient_whatsapp, and new_start_time, new_end_time (ISO).",
+    description: "Reschedule an existing appointment. Need patient_email or patient_whatsapp (phone), and new_start_time, new_end_time (ISO).",
     parameters: {
       type: "object",
       properties: {
         patient_email: { type: "string", description: "Patient email (or use patient_whatsapp)" },
-        patient_whatsapp: { type: "string", description: "Patient WhatsApp/phone (or use patient_email)" },
+        patient_whatsapp: { type: "string", description: "Patient phone (or use patient_email)" },
         new_start_time: { type: "string", description: "New start ISO" },
         new_end_time: { type: "string", description: "New end ISO" },
       },
@@ -240,7 +240,7 @@ const CANCEL_APPOINTMENT_TOOL = {
       type: "object",
       properties: {
         patient_email: { type: "string", description: "Patient email (or use patient_whatsapp)" },
-        patient_whatsapp: { type: "string", description: "Patient WhatsApp/phone (or use patient_email)" },
+        patient_whatsapp: { type: "string", description: "Patient phone (or use patient_email)" },
       },
       required: [],
     },
@@ -353,27 +353,30 @@ export async function POST(request: Request) {
       if (clinicRow) {
         const { data: ownerRow } = await supabaseForTakeover
           .from("clinic_members")
-          .select("user_id")
+          .select("app_user_id")
           .eq("clinic_id", (clinicRow as { id: string }).id)
           .eq("role", "owner")
           .limit(1)
           .maybeSingle();
-        if (ownerRow) {
-          try {
-            const { data: { user } } = await supabaseForTakeover.auth.admin.getUserById((ownerRow as { user_id: string }).user_id);
-            const to = user?.email;
-            if (to) {
-              await sendResendEmail({
-                to,
-                subject: "Chat: patient requested human assistance",
-                html: renderEmailHtml({
-                  greeting: "Hi,",
-                  body: `<p>A visitor on your chat widget asked for human assistance (e.g. complaint, refund, or similar).</p><p><strong>Clinic:</strong> ${escapeHtml((clinicRow as { name: string }).name)}</p><p>Please follow up with them directly.</p>`,
-                  link: { text: "Open DentraFlow", url: (process.env.NEXT_PUBLIC_APP_URL || "https://www.dentraflow.com").replace(/\/$/, "") + "/app" },
-                }),
-              });
-            }
-          } catch { /* noop */ }
+        const appUserId = (ownerRow as { app_user_id?: string } | null)?.app_user_id;
+        if (appUserId) {
+          const { data: appUser } = await supabaseForTakeover
+            .from("app_users")
+            .select("email")
+            .eq("id", appUserId)
+            .maybeSingle();
+          const to = (appUser as { email?: string } | null)?.email;
+          if (to) {
+            await sendResendEmail({
+              to,
+              subject: "Chat: patient requested human assistance",
+              html: renderEmailHtml({
+                greeting: "Hi,",
+                body: `<p>A visitor on your chat widget asked for human assistance (e.g. complaint, refund, or similar).</p><p><strong>Clinic:</strong> ${escapeHtml((clinicRow as { name: string }).name)}</p><p>Please follow up with them directly.</p>`,
+                link: { text: "Open DentraFlow", url: (process.env.NEXT_PUBLIC_APP_URL || "https://www.dentraflow.com").replace(/\/$/, "") + "/app" },
+              }),
+            });
+          }
         }
       }
     }
@@ -772,7 +775,7 @@ export async function POST(request: Request) {
           const whatsapp = args.patient_whatsapp?.trim();
           if (!patient_name || !start_time || !end_time) continue;
           if (!email && !whatsapp) {
-            toolResultText = "Booking failed: need at least email or WhatsApp. Ask the patient for one.";
+            toolResultText = "Booking failed: need at least email or phone. Ask the patient for one.";
             break;
           }
           const result = await executeBooking({

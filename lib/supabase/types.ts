@@ -1,4 +1,4 @@
-export type PlanId = "starter" | "pro" | "elite";
+export type PlanId = "starter" | "pro" | "elite" | "smart_booking";
 
 /** Plan limits: null = unlimited */
 export interface PlanLimits {
@@ -14,6 +14,7 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
   starter: { locations: 1, staffAssistants: 1, chatWidgets: 1 },
   pro: { locations: 3, staffAssistants: 2, chatWidgets: 3 },
   elite: { locations: 10, staffAssistants: 5, chatWidgets: 10 },
+  smart_booking: { locations: 10, staffAssistants: 5, chatWidgets: 10 },
 };
 
 export interface SignupTempData {
@@ -46,6 +47,12 @@ export const PLANS: { id: PlanId; name: string; priceCents: number; description:
   { id: "starter", name: "Starter", priceCents: 2900, description: "Best for single-location clinics" },
   { id: "pro", name: "Pro", priceCents: 7900, description: "Best for growing clinics" },
   { id: "elite", name: "Elite", priceCents: 14900, description: "Best for large clinics & small chains" },
+  {
+    id: "smart_booking",
+    name: "Smart Booking Site",
+    priceCents: 19900,
+    description: "Best for clinics that want a complete AI-powered booking website",
+  },
 ];
 
 export const PLAN_FEATURES: Record<PlanId, string[]> = {
@@ -74,18 +81,31 @@ export const PLAN_FEATURES: Record<PlanId, string[]> = {
     "Up to 5 assistants",
     "Up to 10 chat widgets",
     "Up to 5,000 booking interactions/day",
-    "WhatsApp confirmations & reminders",
+    "Email confirmations & reminders",
     "Automated no-show recovery",
-    "Revenue & performance reports",
+    "Revenue, performance, and paid booking (deposit) reports",
     "Custom branding (logo & widget colors)",
     "Add to Google Calendar (after booking)",
+  ],
+  smart_booking: [
+    "Everything in Elite",
+    "Dedicated Smart Booking Page (dentraflow.com/clinic-name)",
+    "Fully branded booking experience",
+    "Mobile-optimized standalone site",
+    "Conversion-optimized layout",
+    "Shareable booking link & QR code",
+    "Premium hosting & performance",
+    "Priority onboarding assistance",
   ],
 };
 
 export function slugFromName(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
+  const slug =
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
     || "clinic";
+  // "demo" is reserved (public clinic API rejects it for embed). Use a safe alternative.
+  return slug === "demo" ? "demo-clinic" : slug;
 }

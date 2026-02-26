@@ -13,14 +13,17 @@ export function RefundContent() {
         >
           Refund Policy
         </motion.h1>
-        <motion.p
+        <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05 }}
-          className="mt-4 text-slate-500"
+          className="mt-4 space-y-1 text-slate-500"
         >
-          Last updated: February 2025
-        </motion.p>
+          <p>Effective Date: February 2025</p>
+          <p>Company Name: DentraFlow</p>
+          <p>Website: https://www.dentraflow.com</p>
+          <p>Contact Email: support@dentraflow.com</p>
+        </motion.div>
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -28,39 +31,149 @@ export function RefundContent() {
           className="mt-10 space-y-8 text-slate-600 break-words"
         >
           <section>
-            <h2 className="text-xl font-semibold text-slate-900">Eligibility</h2>
-            <p>
-              Refunds are only available if you cancel during the free trial—the first 3 days of your first month. If you cancel at any time after the free trial, no refund will be given for current or past billing periods. You may cancel whenever you want; refunds are limited to cancellations within that initial 3-day trial. To be eligible for a refund, you must contact us within the free-trial window and provide your account email and a brief reason for the request. We do not offer refunds for subsequent months or for charges after the first month except where required by law (e.g. in certain jurisdictions).
+            <h2 className="text-xl font-semibold text-slate-900">1. Overview</h2>
+            <p className="mt-2">
+              This Refund Policy explains how refunds are handled for:
+            </p>
+            <ul className="mt-2 list-disc space-y-1 pl-6">
+              <li>Subscription fees paid by dental clinics to DentraFlow</li>
+              <li>Appointment deposits paid by patients to dental clinics</li>
+            </ul>
+            <p className="mt-4">
+              DentraFlow is a software platform and does not provide dental or medical services.
             </p>
           </section>
+
           <section>
-            <h2 className="text-xl font-semibold text-slate-900">How to request</h2>
-            <p>
-              To request a refund, contact us via the Contact page on our website or at support@dentraflow.com. Include your account email (the one used to sign up) and, if you wish, a short reason. We will verify your account and confirm whether your cancellation fell within the first 3-day free trial of your first month; only then is a refund issued.
+            <h2 className="text-xl font-semibold text-slate-900">SECTION A — CLINIC SUBSCRIPTION REFUNDS</h2>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-slate-900">2. Subscription Fees</h2>
+            <p className="mt-2">
+              DentraFlow offers subscription-based plans for dental clinics.
+            </p>
+            <p className="mt-2">
+              Unless otherwise stated in writing:
+            </p>
+            <ul className="mt-2 list-disc space-y-1 pl-6">
+              <li>Subscription fees are non-refundable.</li>
+              <li>Partial months are not prorated.</li>
+              <li>Failure to use the platform does not qualify for a refund.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-slate-900">3. Free Trials (If Applicable)</h2>
+            <p className="mt-2">
+              If a free trial is offered:
+            </p>
+            <ul className="mt-2 list-disc space-y-1 pl-6">
+              <li>Clinics may cancel before the trial ends to avoid charges.</li>
+              <li>Once a paid billing cycle begins, the subscription fee is non-refundable.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-slate-900">4. Billing Errors</h2>
+            <p className="mt-2">
+              If you believe you were charged incorrectly, you must contact us within 14 days of the billing date.
+            </p>
+            <p className="mt-2">
+              Verified billing errors will be corrected.
             </p>
           </section>
+
           <section>
-            <h2 className="text-xl font-semibold text-slate-900">Processing</h2>
-            <p>
-              We will process eligible refund requests within 5–10 business days. Refunds are issued to the original payment method used for the charge. Depending on your bank or card issuer, it may take additional time for the refund to appear on your statement. We will email you once the refund has been processed.
+            <h2 className="text-xl font-semibold text-slate-900">SECTION B — PATIENT APPOINTMENT DEPOSITS</h2>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-slate-900">5. Deposit Payments</h2>
+            <p className="mt-2">
+              Appointment deposits are paid directly to the dental clinic through third-party payment providers (such as PayPal).
+            </p>
+            <p className="mt-2">DentraFlow:</p>
+            <ul className="mt-2 list-disc space-y-1 pl-6">
+              <li>Does not collect or hold patient funds</li>
+              <li>Does not control clinic refund decisions</li>
+              <li>Is not responsible for refund processing</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-slate-900">6. Clinic Cancellation Policies</h2>
+            <p className="mt-2">
+              Refund eligibility for appointment deposits is determined solely by the dental clinic&apos;s cancellation policy.
+            </p>
+            <p className="mt-2">
+              Patients must review the clinic&apos;s cancellation terms before completing payment.
+            </p>
+            <p className="mt-2">
+              For refund requests, patients must contact the dental clinic directly.
             </p>
           </section>
+
           <section>
-            <h2 className="text-xl font-semibold text-slate-900">Free trial only</h2>
-            <p>
-              The free trial is the first 3 days of your first month. If you cancel during that period and have been charged, we will refund that charge. If you cancel during the free trial and were never charged, there is nothing to refund. We do not offer refunds for cancellations after the 3-day trial, for plan upgrades or downgrades that have already taken effect, or for any charges after the first month, except where local law requires otherwise.
+            <h2 className="text-xl font-semibold text-slate-900">7. Payment Disputes & Chargebacks</h2>
+            <p className="mt-2">
+              If a patient initiates a dispute or chargeback:
+            </p>
+            <ul className="mt-2 list-disc space-y-1 pl-6">
+              <li>The dispute is handled between the patient, the clinic, and the payment provider.</li>
+              <li>DentraFlow is not responsible for resolving payment disputes related to clinical services.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-slate-900">SECTION C — GENERAL PROVISIONS</h2>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-slate-900">8. Service Interruptions</h2>
+            <p className="mt-2">
+              Temporary technical interruptions do not automatically qualify for subscription refunds.
+            </p>
+            <p className="mt-2">
+              In cases of extended platform outages caused solely by DentraFlow, we may offer service credits at our discretion.
             </p>
           </section>
+
           <section>
-            <h2 className="text-xl font-semibold text-slate-900">Exclusions</h2>
-            <p>
-              There is no 30-day or general refund period. Refunds are only for cancellations during the first 3 days (free trial) of the first month. After that, you can still cancel at any time, but no refund will be issued for the current or any previous billing period.
+            <h2 className="text-xl font-semibold text-slate-900">9. Fraudulent Activity</h2>
+            <p className="mt-2">
+              DentraFlow reserves the right to refuse refunds in cases involving:
+            </p>
+            <ul className="mt-2 list-disc space-y-1 pl-6">
+              <li>Abuse of the platform</li>
+              <li>Fraudulent claims</li>
+              <li>Violation of Terms & Conditions</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-slate-900">10. Changes to This Policy</h2>
+            <p className="mt-2">
+              We may update this Refund Policy at any time.
+            </p>
+            <p className="mt-2">
+              Changes will be posted with an updated effective date.
             </p>
           </section>
+
           <section>
-            <h2 className="text-xl font-semibold text-slate-900">Contact</h2>
-            <p>
-              For questions about your subscription or refund eligibility, contact our support team via the Contact page or at support@dentraflow.com.
+            <h2 className="text-xl font-semibold text-slate-900">11. Contact Information</h2>
+            <p className="mt-2">
+              For subscription-related refund inquiries:
+            </p>
+            <p className="mt-4 font-medium text-slate-800">DentraFlow</p>
+            <p className="mt-1">Email: support@dentraflow.com</p>
+            <p className="mt-1">Website: https://www.dentraflow.com</p>
+            <p className="mt-6">
+              For appointment deposit refunds:
+            </p>
+            <p className="mt-2">
+              Please contact the dental clinic directly.
             </p>
           </section>
         </motion.div>

@@ -5,7 +5,7 @@ import { useApp } from "@/lib/app-context";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import { BarChart3, TrendingUp, Calendar, Users, Zap, Crown, Download, FileText } from "lucide-react";
-import { hasPlanFeature, normalizePlan } from "@/lib/plan-features";
+import { hasPlanFeature, normalizePlan, planAtLeast } from "@/lib/plan-features";
 import { getRange, getPeriodLabel, getPreviousRange, PERIOD_OPTIONS, type FilterPeriod } from "@/lib/date-period";
 import { PLANS } from "@/lib/supabase/types";
 import {
@@ -483,8 +483,8 @@ export default function AppAnalyticsPage() {
         <div>
           <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Analytics</h1>
           <p className="mt-1 text-slate-600">
-            {plan === "elite"
-              ? "Full analytics and insights for your Elite plan."
+            {planAtLeast(plan, "elite")
+              ? "Full analytics and insights for your " + (planInfo?.name ?? plan) + " plan."
               : plan === "pro"
                 ? "Basic and advanced booking analytics for your Pro plan."
                 : "Basic booking analytics. Upgrade for advanced insights."}
@@ -492,14 +492,14 @@ export default function AppAnalyticsPage() {
         </div>
         <span
           className={
-            plan === "elite"
+            planAtLeast(plan, "elite")
               ? "inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1.5 text-sm font-medium text-amber-800"
               : plan === "pro"
                 ? "inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary"
                 : "inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-700"
           }
         >
-          {plan === "elite" ? <Crown className="h-4 w-4" /> : plan === "pro" ? <Zap className="h-4 w-4" /> : null}
+          {planAtLeast(plan, "elite") ? <Crown className="h-4 w-4" /> : plan === "pro" ? <Zap className="h-4 w-4" /> : null}
           {planInfo?.name ?? plan} plan
         </span>
       </div>
@@ -715,7 +715,7 @@ export default function AppAnalyticsPage() {
           <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-6">
             <h2 className="font-semibold text-slate-900">Upgrade for Advanced Analytics</h2>
             <p className="mt-2 text-sm text-slate-600">
-              Pro and Elite plans include: busiest days, cancellation rate, completion rate, and (Elite) revenue insights.
+              Pro, Elite, and Smart Booking Site plans include: busiest days, cancellation rate, completion rate, and (Elite / Smart Booking Site) revenue and paid booking insights.
             </p>
             <Link
               href="/app/plan"
@@ -732,7 +732,7 @@ export default function AppAnalyticsPage() {
         <section>
           <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
             <TrendingUp className="h-4 w-4" />
-            Advanced analytics {plan === "elite" ? "(Pro + Elite)" : "(Pro)"}
+            Advanced analytics {planAtLeast(plan, "elite") ? "(Pro + Elite + Smart Booking Site)" : "(Pro)"}
           </h2>
           <div className="space-y-4">
             <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -904,13 +904,13 @@ export default function AppAnalyticsPage() {
             {/* Bookings over time */}
             <div>
               <p className="mb-2 text-sm font-medium text-slate-700">Bookings over time</p>
-              <div className="h-64 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="h-64 min-h-[200px] rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 {advancedLoading || bookingsByDate.length === 0 ? (
                   <div className="flex h-full items-center justify-center text-slate-400">
                     {advancedLoading ? "Loading…" : "No data for this period."}
                   </div>
                 ) : (
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minHeight={200}>
                     <LineChart data={bookingsByDate} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                       <XAxis dataKey="label" tick={{ fontSize: 11 }} />
@@ -932,7 +932,7 @@ export default function AppAnalyticsPage() {
                   : `Missed / no-show: ${noShowCount} appointments (${noShowRate}% of ${total} in period). Past appointments that were not completed or cancelled count as missed.`}
               </p>
               <p className="mt-2 text-xs text-slate-500">
-                Recovery: automated reminders for no-shows are available on Elite (no-show recovery).
+                Recovery: automated reminders for no-shows are available on Elite and Smart Booking Site plans.
               </p>
             </div>
 
@@ -966,8 +966,8 @@ export default function AppAnalyticsPage() {
                 </table>
               </div>
               {!advancedLoading && byHour.some((n) => n > 0) && (
-                <div className="mt-3 h-48 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <ResponsiveContainer width="100%" height="100%">
+                <div className="mt-3 h-48 min-h-[180px] rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <ResponsiveContainer width="100%" height="100%" minHeight={180}>
                     <BarChart
                       data={HOUR_LABELS.map((hour, i) => ({ hour, count: byHour[i] ?? 0 }))}
                       margin={{ top: 5, right: 5, left: 0, bottom: 0 }}

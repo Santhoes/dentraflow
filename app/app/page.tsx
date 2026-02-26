@@ -184,13 +184,10 @@ export default function AppDashboardPage() {
     if (!clinic) return;
     setMarkingComplete(true);
     try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) return;
       const res = await fetch("/api/app/clinic", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ settings_completed_at: true }),
       });
       if (res.ok) await refetchClinic();
@@ -240,7 +237,7 @@ export default function AppDashboardPage() {
             Complete your setup
           </h2>
           <p className="mt-2 text-sm text-slate-600">
-            Fill in clinic details, phone (use a number with WhatsApp for better patient contact), and optional locations so your AI receptionist and analytics work best.
+            Fill in clinic details, phone, and optional locations so your AI receptionist and analytics work best.
           </p>
           <div className="mt-4 flex flex-wrap items-center gap-2 sm:gap-3">
             <Link

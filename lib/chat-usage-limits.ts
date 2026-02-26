@@ -9,6 +9,7 @@ export const CHAT_USAGE_LIMITS: Record<
   starter: { perSession: 40, perDay: 300 },
   pro: { perSession: 120, perDay: 1500 },
   elite: { perSession: 300, perDay: 5000 },
+  smart_booking: { perSession: 300, perDay: 5000 },
 };
 
 export function getChatUsageLimits(

@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useApp } from "@/lib/app-context";
-import { createClient } from "@/lib/supabase/client";
 import { COUNTRIES } from "@/lib/supabase/types";
 import { Loader2, ArrowLeft } from "lucide-react";
 
@@ -50,17 +49,10 @@ export default function AppSettingsDetailsPage() {
     setSaving(true);
     setMessage(null);
     try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) {
-        setMessage({ type: "err", text: "Please sign in again." });
-        setSaving(false);
-        return;
-      }
       const res = await fetch("/api/app/clinic", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: form.name.trim(),
           country: form.country.trim(),
