@@ -602,6 +602,31 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
     if (!selectedSlot?.start || !selectedSlot?.end || !patientName || !patientEmail) return;
     const phoneForBooking = patientPhone?.replace(/\s/g, "") || undefined;
     try {
+      // #region agent log
+      fetch('http://127.0.0.1:7785/ingest/8b7a328f-cfbf-41bb-bc5d-dd8a87f78da9', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Debug-Session-Id': 'b6bc01',
+        },
+        body: JSON.stringify({
+          sessionId: 'b6bc01',
+          runId: 'pre-booking',
+          hypothesisId: 'H1',
+          location: 'components/embed/useDentalAgent.ts:doConfirmBooking:beforeFetch',
+          message: 'Attempting booking from widget',
+          data: {
+            clinicSlug,
+            hasPatientEmail: !!patientEmail,
+            hasPatientName: !!patientName,
+            start_time: selectedSlot.start,
+            end_time: selectedSlot.end,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion agent log
+
       const res = await fetch(`${baseUrl}/api/embed/confirm-booking`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -617,6 +642,30 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
         }),
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };
+
+      // #region agent log
+      fetch('http://127.0.0.1:7785/ingest/8b7a328f-cfbf-41bb-bc5d-dd8a87f78da9', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Debug-Session-Id': 'b6bc01',
+        },
+        body: JSON.stringify({
+          sessionId: 'b6bc01',
+          runId: 'pre-booking',
+          hypothesisId: 'H2',
+          location: 'components/embed/useDentalAgent.ts:doConfirmBooking:afterFetch',
+          message: 'Booking response from /api/embed/confirm-booking',
+          data: {
+            status: res.status,
+            okFlag: data.ok === true,
+            hasError: typeof data.error === 'string',
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion agent log
+
       if (data.ok) {
         setCurrentState("BOOKING_SUCCESS");
         const startStr = formatInClinicTz(selectedSlot.start, clinicInfo.timezone);
@@ -935,6 +984,7 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
     inputPlaceholder,
     isLoadingSlots,
     currentState,
+    patientDetailsStep,
     onChipSelect: effectiveOnChipSelect,
     onSend,
     clinicInfo,

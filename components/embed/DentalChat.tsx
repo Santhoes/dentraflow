@@ -83,6 +83,8 @@ export function DentalChat(config: DentalChatConfig) {
     isInputDisabled,
     inputPlaceholder,
     isLoadingSlots,
+    currentState,
+    patientDetailsStep,
     onChipSelect,
     onSend,
     showPolicyAgreement,
@@ -148,6 +150,13 @@ export function DentalChat(config: DentalChatConfig) {
   }));
 
   const showSuggestions = suggestionItems.length > 0 || isLoadingSlots;
+
+  const inputType: "text" | "email" =
+    currentState === "PATIENT_DETAILS" && patientDetailsStep === "email"
+      ? "email"
+      : currentState === "VERIFY_ACCOUNT"
+        ? "email"
+        : "text";
 
   if (!mounted) {
     return (
@@ -261,6 +270,7 @@ export function DentalChat(config: DentalChatConfig) {
                 onSend={handleSend}
                 disabled={isInputDisabled}
                 placeholder={inputPlaceholder ?? (isInputDisabled ? "Choose an option above" : "Type here...")}
+                inputType={inputType}
                 voiceSupported={false}
                 isListening={false}
                 onVoiceClick={() => {}}

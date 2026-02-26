@@ -10,6 +10,7 @@ interface ChatInputProps {
   onSend: (text: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  inputType?: "text" | "email";
   voiceSupported: boolean;
   isListening: boolean;
   onVoiceClick: () => void;
@@ -23,6 +24,7 @@ export function ChatInput({
   onSend,
   disabled,
   placeholder = "Type a message...",
+  inputType = "text",
   voiceSupported,
   isListening,
   onVoiceClick,
@@ -46,7 +48,7 @@ export function ChatInput({
     >
       <input
         ref={inputRef}
-        type="text"
+        type={inputType}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}

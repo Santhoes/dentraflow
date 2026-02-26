@@ -34,6 +34,32 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
   const { clinicSlug, sig, patient_email, patient_name, patient_phone, start_time, end_time, policy_accepted_at } = body;
+
+  // #region agent log
+  fetch('http://127.0.0.1:7785/ingest/8b7a328f-cfbf-41bb-bc5d-dd8a87f78da9', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Debug-Session-Id': 'b6bc01',
+    },
+    body: JSON.stringify({
+      sessionId: 'b6bc01',
+      runId: 'pre-booking',
+      hypothesisId: 'H3',
+      location: 'app/api/embed/confirm-booking/route.ts:POST:start',
+      message: 'Incoming confirm-booking request',
+      data: {
+        clinicSlug,
+        hasSig: !!sig,
+        hasPatientEmail: !!patient_email,
+        hasPatientName: !!patient_name,
+        hasStart: !!start_time,
+        hasEnd: !!end_time,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion agent log
   if (!clinicSlug?.trim() || !sig?.trim() || !start_time?.trim() || !end_time?.trim()) {
     return NextResponse.json({ error: "clinicSlug, sig, start_time, end_time required" }, { status: 400 });
   }
@@ -57,7 +83,30 @@ export async function POST(request: Request) {
   }
   const planExpiresAt = (clinic as { plan_expires_at?: string | null }).plan_expires_at;
   if (planExpiresAt && new Date(planExpiresAt) <= new Date()) {
-    return NextResponse.json({ error: "Plan expired" }, { status: 403 });
+    const resp = NextResponse.json({ error: "Plan expired" }, { status: 403 });
+    // #region agent log
+    fetch('http://127.0.0.1:7785/ingest/8b7a328f-cfbf-41bb-bc5d-dd8a87f78da9', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Debug-Session-Id': 'b6bc01',
+      },
+      body: JSON.stringify({
+        sessionId: 'b6bc01',
+        runId: 'pre-booking',
+        hypothesisId: 'H4',
+        location: 'app/api/embed/confirm-booking/route.ts:POST:planExpired',
+        message: 'Booking blocked due to plan expired',
+        data: {
+          clinicSlug,
+          plan: (clinic as { plan?: string | null }).plan ?? null,
+          plan_expires_at: planExpiresAt,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion agent log
+    return resp;
   }
 
   const clinicId = (clinic as { id: string }).id;
@@ -139,10 +188,33 @@ export async function POST(request: Request) {
     .limit(1)
     .maybeSingle();
   if (existingSameDay) {
-    return NextResponse.json(
+    const resp = NextResponse.json(
       { error: "You already have an appointment on this day. One appointment per day per person." },
       { status: 400 }
     );
+    // #region agent log
+    fetch('http://127.0.0.1:7785/ingest/8b7a328f-cfbf-41bb-bc5d-dd8a87f78da9', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Debug-Session-Id': 'b6bc01',
+      },
+      body: JSON.stringify({
+        sessionId: 'b6bc01',
+        runId: 'pre-booking',
+        hypothesisId: 'H5',
+        location: 'app/api/embed/confirm-booking/route.ts:POST:sameDayBlock',
+        message: 'Booking blocked due to existing same-day appointment',
+        data: {
+          clinicSlug,
+          patientHasExistingSameDay: true,
+          startDay,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion agent log
+    return resp;
   }
 
   const { error: apptErr } = await admin
@@ -159,7 +231,29 @@ export async function POST(request: Request) {
     });
 
   if (apptErr) {
-    return NextResponse.json({ error: apptErr.message }, { status: 500 });
+    const resp = NextResponse.json({ error: apptErr.message }, { status: 500 });
+    // #region agent log
+    fetch('http://127.0.0.1:7785/ingest/8b7a328f-cfbf-41bb-bc5d-dd8a87f78da9', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Debug-Session-Id': 'b6bc01',
+      },
+      body: JSON.stringify({
+        sessionId: 'b6bc01',
+        runId: 'pre-booking',
+        hypothesisId: 'H6',
+        location: 'app/api/embed/confirm-booking/route.ts:POST:insertError',
+        message: 'Supabase insert into appointments failed',
+        data: {
+          clinicSlug,
+          errorMessage: apptErr.message,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion agent log
+    return resp;
   }
 
   const clinicPlan = (clinic as { plan?: string }).plan;
@@ -181,5 +275,28 @@ export async function POST(request: Request) {
     clinicMemberEmails,
   });
 
-  return NextResponse.json({ ok: true });
+  const resp = NextResponse.json({ ok: true });
+  // #region agent log
+  fetch('http://127.0.0.1:7785/ingest/8b7a328f-cfbf-41bb-bc5d-dd8a87f78da9', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Debug-Session-Id': 'b6bc01',
+    },
+    body: JSON.stringify({
+      sessionId: 'b6bc01',
+      runId: 'pre-booking',
+      hypothesisId: 'H7',
+      location: 'app/api/embed/confirm-booking/route.ts:POST:success',
+      message: 'Booking created successfully',
+      data: {
+        clinicSlug,
+        clinicId,
+        patientHasEmail: !!patientEmail,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion agent log
+  return resp;
 }
