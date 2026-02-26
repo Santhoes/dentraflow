@@ -451,7 +451,26 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
 
       if (currentState === "VERIFY_ACCOUNT") {
         const emailMatch = trimmed.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
-        const email = emailMatch ? emailMatch[0].toLowerCase() : trimmed.toLowerCase();
+        const email = (emailMatch ? emailMatch[0] : trimmed).toLowerCase();
+
+        // Frontend validation so users don't waste attempts on clearly invalid emails.
+        const emailCheck = isValidChatEmail(email);
+        if (!emailCheck.valid) {
+          const nextAttempt = verifyAttemptCount + 1;
+          setVerifyAttemptCount(nextAttempt);
+          const msg = emailCheck.error ?? "Please enter a valid email address.";
+          if (nextAttempt >= 3) {
+            setIsInputDisabled(true);
+            setStateWithMessageAndSuggestions("VERIFY_ACCOUNT", msg, [
+              { key: "book", label: "Book Appointment", variant: "primary" },
+              backChip,
+            ]);
+          } else {
+            setStateWithMessageAndSuggestions("VERIFY_ACCOUNT", msg, []);
+          }
+          return;
+        }
+
         try {
           const res = await fetch(`${baseUrl}/api/embed/verify-patient`, {
             method: "POST",
@@ -482,10 +501,14 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
             setVerifyAttemptCount(nextAttempt);
             if (nextAttempt >= 3) {
               setIsInputDisabled(true);
-              setStateWithMessageAndSuggestions("VERIFY_ACCOUNT", apiError ?? "No booking found for this email. You can book a new appointment or go back.", [
-                { key: "book", label: "Book Appointment", variant: "primary" },
-                backChip,
-              ]);
+              setStateWithMessageAndSuggestions(
+                "VERIFY_ACCOUNT",
+                apiError ?? "No booking found for this email. You can book a new appointment or go back.",
+                [
+                  { key: "book", label: "Book Appointment", variant: "primary" },
+                  backChip,
+                ]
+              );
             } else {
               const tryAgainMsg = apiError ?? `Email not found. Please try again (${nextAttempt} of 3).`;
               setStateWithMessageAndSuggestions("VERIFY_ACCOUNT", tryAgainMsg, []);
@@ -496,10 +519,14 @@ export function useDentalAgent(config: UseDentalAgentConfig) {
           setVerifyAttemptCount(nextAttempt);
           if (nextAttempt >= 3) {
             setIsInputDisabled(true);
-            setStateWithMessageAndSuggestions("VERIFY_ACCOUNT", "Something went wrong. You can book a new appointment or go back.", [
-              { key: "book", label: "Book Appointment", variant: "primary" },
-              backChip,
-            ]);
+            setStateWithMessageAndSuggestions(
+              "VERIFY_ACCOUNT",
+              "Something went wrong. You can book a new appointment or go back.",
+              [
+                { key: "book", label: "Book Appointment", variant: "primary" },
+                backChip,
+              ]
+            );
           } else {
             setStateWithMessageAndSuggestions(
               "VERIFY_ACCOUNT",
